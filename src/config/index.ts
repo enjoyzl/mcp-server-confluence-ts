@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 import { z } from 'zod';
-import { Logger } from '../utils/logger';
-import { ConfluenceConfig } from '../types';
+import { Logger } from '../utils/logger.js';
+import { ConfluenceConfig } from '../types/index.js';
 
 // 加载环境变量
 dotenv.config();

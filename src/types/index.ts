@@ -2,6 +2,8 @@ export interface ConfluenceConfig {
   baseUrl: string;
   username: string;
   password: string;
+  timeout?: number;
+  rejectUnauthorized?: boolean;
 }
 
 export interface AppConfig {
@@ -22,7 +24,10 @@ export interface ConfluenceSpace {
   key: string;
   name: string;
   type: string;
-  status: string;
+  _links: {
+    webui: string;
+    self: string;
+  };
 }
 
 export interface ConfluencePage {
@@ -30,36 +35,45 @@ export interface ConfluencePage {
   type: string;
   status: string;
   title: string;
-  space?: {
-    id: string;
-    key: string;
-    name: string;
-  };
+  space: ConfluenceSpace;
   body?: {
     storage: {
       value: string;
       representation: string;
     };
   };
-  version?: {
-    number: number;
-    by: {
-      username: string;
-      displayName: string;
-    };
+  _links: {
+    webui: string;
+    edit?: string;
+    tinyui?: string;
+    self: string;
   };
 }
 
 export interface SearchResult {
-  results: ConfluencePage[];
+  results: Array<{
+    content: ConfluencePage;
+    title: string;
+    excerpt: string;
+    url: string;
+    resultGlobalContainer: {
+      title: string;
+      displayUrl: string;
+    };
+  }>;
   start: number;
   limit: number;
   size: number;
   totalSize: number;
+  _links: {
+    base: string;
+    context: string;
+    self: string;
+  };
 }
 
 export interface ErrorResponse {
-  statusCode: number;
   message: string;
-  error?: any;
+  statusCode?: number;
+  [key: string]: any;
 } 

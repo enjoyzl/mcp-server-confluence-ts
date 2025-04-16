@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from 'zod';
-import { config } from './config.js';
+import { config } from './config/index.js';
 import { ConfluenceClient } from './services/confluence-client.js';
 import { Logger } from './utils/logger.js';
 import { ErrorResponse } from './types/index.js';
