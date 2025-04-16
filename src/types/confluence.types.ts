@@ -1,3 +1,4 @@
+// Confluence API 配置
 export interface ConfluenceConfig {
   baseUrl: string;
   username: string;
@@ -6,19 +7,7 @@ export interface ConfluenceConfig {
   rejectUnauthorized?: boolean;
 }
 
-export interface AppConfig {
-  confluence: {
-    url: string;
-    username: string;
-    password: string;
-  };
-  server: {
-    port: number;
-    env: 'development' | 'production';
-    timeout: number;
-  };
-}
-
+// Confluence 空间信息
 export interface ConfluenceSpace {
   id: string;
   key: string;
@@ -30,6 +19,7 @@ export interface ConfluenceSpace {
   };
 }
 
+// Confluence 页面信息
 export interface ConfluencePage {
   id: string;
   type: string;
@@ -50,6 +40,7 @@ export interface ConfluencePage {
   };
 }
 
+// 搜索结果
 export interface SearchResult {
   results: Array<{
     content: ConfluencePage;
@@ -72,8 +63,15 @@ export interface SearchResult {
   };
 }
 
+// API 错误响应
 export interface ErrorResponse {
   message: string;
   statusCode?: number;
-  [key: string]: any;
+  error?: any;
+  config?: {
+    url?: string;
+    method?: string;
+    params?: any;
+    headers?: Record<string, any>;
+  };
 } 

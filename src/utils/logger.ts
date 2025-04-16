@@ -1,30 +1,48 @@
-export class Logger {
-  private static instance: Logger;
-  private debugMode: boolean;
-  private messageId: number = 0;
-  private logToConsole: boolean;
+import { LogLevel, LogMessage } from '../types/logger.types.js';
 
-  private constructor() {
-    this.debugMode = process.env.NODE_ENV === 'development';
-    // 默认在服务端输出日志，在浏览器端不输出
-    this.logToConsole = typeof window === 'undefined';
-  }
+/**
+ * 日志服务接口
+ */
+export interface ILoggerService {
+  debug(message: string, ...args: any[]): void;
+  info(message: string, ...args: any[]): void;
+  warn(message: string, ...args: any[]): void;
+  error(message: string, ...args: any[]): void;
+}
 
-  static getInstance(): Logger {
-    if (!Logger.instance) {
-      Logger.instance = new Logger();
+/**
+ * 日志消息格式
+ */
+interface McpLogMessage {
+  jsonrpc: "2.0";
+  method: "log";
+  params: {
+    level: "debug" | "info" | "warn" | "error";
+    message: string;
+    args?: any[];
+    timestamp: string;
+  };
+}
+
+/**
+ * 日志服务实现类
+ */
+class LoggerImpl implements ILoggerService {
+  private static instance: LoggerImpl;
+  private constructor() {}
+
+  public static getInstance(): LoggerImpl {
+    if (!LoggerImpl.instance) {
+      LoggerImpl.instance = new LoggerImpl();
     }
-    return Logger.instance;
+    return LoggerImpl.instance;
   }
 
-  // 设置是否输出到控制台
-  setLogToConsole(enable: boolean) {
-    this.logToConsole = enable;
-  }
-
-  private formatMessage(level: string, message: string, ...args: any[]): string {
-    this.messageId++;
-    const logMessage = {
+  /**
+   * 创建日志消息
+   */
+  private createLogMessage(level: "debug" | "info" | "warn" | "error", message: string, args: any[] = []): string {
+    const logMessage: McpLogMessage = {
       jsonrpc: "2.0",
       method: "log",
       params: {
@@ -32,48 +50,27 @@ export class Logger {
         message,
         args: args.length > 0 ? args : undefined,
         timestamp: new Date().toISOString()
-      },
-      id: this.messageId
+      }
     };
-
     return JSON.stringify(logMessage);
   }
 
-  private log(level: string, message: string, ...args: any[]) {
-    if (!this.logToConsole) return;
-
-    const formattedMessage = this.formatMessage(level, message, ...args);
-    switch (level) {
-      case 'info':
-        console.log(formattedMessage);
-        break;
-      case 'error':
-        console.error(formattedMessage);
-        break;
-      case 'debug':
-        if (this.debugMode) {
-          console.debug(formattedMessage);
-        }
-        break;
-      case 'warn':
-        console.warn(formattedMessage);
-        break;
-    }
+  public debug(message: string, ...args: any[]): void {
+    console.debug(this.createLogMessage("debug", message, args));
   }
 
-  info(message: string, ...args: any[]) {
-    this.log('info', message, ...args);
+  public info(message: string, ...args: any[]): void {
+    console.info(this.createLogMessage("info", message, args));
   }
 
-  error(message: string, error?: any) {
-    this.log('error', message, error);
+  public warn(message: string, ...args: any[]): void {
+    console.warn(this.createLogMessage("warn", message, args));
   }
 
-  debug(message: string, ...args: any[]) {
-    this.log('debug', message, ...args);
+  public error(message: string, ...args: any[]): void {
+    console.error(this.createLogMessage("error", message, args));
   }
+}
 
-  warn(message: string, ...args: any[]) {
-    this.log('warn', message, ...args);
-  }
-} 
+// 导出单例实例
+export const Logger = LoggerImpl; 

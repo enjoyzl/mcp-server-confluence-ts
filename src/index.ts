@@ -1,13 +1,20 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from 'zod';
-import { config } from './config/index.js';
-import { ConfluenceClient } from './services/confluence-client.js';
+import { configService } from './config/config.service.js';
+import { ConfluenceService } from './services/confluence.service.js';
 import { Logger } from './utils/logger.js';
-import { ErrorResponse } from './types/index.js';
+import { ErrorResponse } from './types/confluence.types.js';
 
+/**
+ * MCP 服务器实例
+ */
 const logger = Logger.getInstance();
 
+/**
+ * 主函数
+ * 负责初始化和启动 MCP 服务器
+ */
 async function main() {
   try {
     logger.info("MCP 服务器启动中...");
@@ -26,11 +33,14 @@ async function main() {
 
     logger.debug("MCP 服务器已创建");
 
-    // 创建 Confluence 客户端
-    const confluenceClient = new ConfluenceClient({
+    // 创建 Confluence 服务实例
+    const config = configService.getConfig();
+    const confluenceService = new ConfluenceService({
       baseUrl: config.baseUrl,
       username: config.username,
-      password: config.password
+      password: config.password,
+      timeout: config.timeout,
+      rejectUnauthorized: config.rejectUnauthorized
     });
 
     // 注册工具
@@ -40,7 +50,7 @@ async function main() {
       async ({ spaceKey }) => {
         try {
           logger.debug(`调用 getSpace 工具，参数: ${spaceKey}`);
-          const space = await confluenceClient.getSpace(spaceKey);
+          const space = await confluenceService.getSpace(spaceKey);
           return {
             content: [{ 
               type: "text",
@@ -66,7 +76,7 @@ async function main() {
       async ({ pageId }) => {
         try {
           logger.debug(`调用 getPage 工具，参数: ${pageId}`);
-          const page = await confluenceClient.getPage(pageId);
+          const page = await confluenceService.getPage(pageId);
           return {
             content: [{ 
               type: "text",
@@ -92,7 +102,7 @@ async function main() {
       async ({ query }) => {
         try {
           logger.debug(`调用 searchContent 工具，参数: ${query}`);
-          const results = await confluenceClient.searchContent(query);
+          const results = await confluenceService.searchContent(query);
           return {
             content: [{ 
               type: "text",
@@ -118,7 +128,7 @@ async function main() {
       async ({ pageId }) => {
         try {
           logger.debug(`调用 getPageContent 工具，参数: ${pageId}`);
-          const content = await confluenceClient.getPageContent(pageId);
+          const content = await confluenceService.getPageContent(pageId);
           return {
             content: [{ 
               type: "text",
@@ -145,27 +155,8 @@ async function main() {
     await server.connect(transport);
     logger.info("MCP 服务器已成功连接并启动");
 
-    // 优雅关闭
-    process.on('SIGINT', () => {
-      logger.info("收到 SIGINT 信号，正在关闭...");
-      transport.close();
-      process.exit(0);
-    });
-
-    process.on('SIGTERM', () => {
-      logger.info("收到 SIGTERM 信号，正在关闭...");
-      transport.close();
-      process.exit(0);
-    });
-
-    process.on('unhandledRejection', (reason, promise) => {
-      logger.error('未处理的 Promise 拒绝:', reason);
-    });
-
-    process.on('uncaughtException', (error) => {
-      logger.error('未捕获的异常:', error);
-      process.exit(1);
-    });
+    // 注册进程事件处理
+    registerProcessHandlers(transport);
 
   } catch (error) {
     logger.error('服务器启动失败:', error);
@@ -173,4 +164,32 @@ async function main() {
   }
 }
 
+/**
+ * 注册进程事件处理器
+ */
+function registerProcessHandlers(transport: StdioServerTransport): void {
+  // 优雅关闭
+  process.on('SIGINT', () => {
+    logger.info("收到 SIGINT 信号，正在关闭...");
+    transport.close();
+    process.exit(0);
+  });
+
+  process.on('SIGTERM', () => {
+    logger.info("收到 SIGTERM 信号，正在关闭...");
+    transport.close();
+    process.exit(0);
+  });
+
+  process.on('unhandledRejection', (reason, promise) => {
+    logger.error('未处理的 Promise 拒绝:', reason);
+  });
+
+  process.on('uncaughtException', (error) => {
+    logger.error('未捕获的异常:', error);
+    process.exit(1);
+  });
+}
+
+// 启动服务器
 main(); 
