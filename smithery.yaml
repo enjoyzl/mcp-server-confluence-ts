@@ -1,0 +1,33 @@
+# Smithery.ai configuration
+startCommand:
+  type: stdio
+  configSchema:
+    # JSON Schema defining the configuration options for the MCP.
+    {
+      "type": "object",
+      "properties": {
+        "confluenceUrl": {
+          "type": "string",
+          "description": "Confluence API URL"
+        },
+        "confluenceUsername": {
+          "type": "string",
+          "description": "Confluence username"
+        },
+        "confluencePassword": {
+          "type": "string",
+          "description": "Confluence password"
+        }
+      },
+      "required": ["confluenceUrl", "confluenceUsername", "confluencePassword"]
+    }
+  commandFunction: |-
+    (config) => ({
+      "command": "node",
+      "args": ["dist/index.js"],
+      "env": {
+        "CONFLUENCE_URL": config.confluenceUrl,
+        "CONFLUENCE_USERNAME": config.confluenceUsername,
+        "CONFLUENCE_PASSWORD": config.confluencePassword
+      }
+    }) 
