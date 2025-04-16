@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "confluence": {
+      "command": "node",
+      "args": ["dist/index.js"],
+      "env": {
+        "NODE_ENV": "development",
+        "BASE_URL": "http://dms.intelnal.howbuy.com",
+        "USERNAME": "zhenling.chen",
+        "PASSWORD": "Zhenling@123"
+      }
+    }
+  },
+  "inspector": {
+    "clientPort": 8080,
+    "serverPort": 9000,
+    "debug": true
+  }
+} 
