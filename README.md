@@ -2,6 +2,16 @@
 
 这是一个基于 MCP (Model Context Protocol) 的 Confluence API 服务实现。该服务提供了与 Confluence 进行交互的能力，支持获取空间信息、页面内容、搜索等功能。
 
+## 目录
+- [功能特性](#功能特性)
+- [快速开始](#快速开始)
+- [配置说明](#配置说明)
+- [开发指南](#开发指南)
+- [API使用](#api使用)
+- [性能优化](#性能优化)
+- [调试指南](#调试指南)
+- [错误处理](#错误处理)
+
 ## 功能特性
 
 - 支持基本的 Confluence API 操作
@@ -18,22 +28,39 @@
   - 请求耗时统计
   - 详细的错误信息
 
-## 环境要求
+## 快速开始
+
+### 环境要求
 
 - Node.js >= 14.0.0
 - TypeScript >= 4.0.0
 
-## 安装
+### 安装
 
 ```bash
+# 安装依赖
 npm install
 ```
 
-## 配置
+### 构建
+
+```bash
+# 清理并构建项目
+npm run build:clean
+```
+
+### 启动服务
+
+```bash
+# 启动服务
+npm start
+```
+
+## 配置说明
 
 ### 环境变量配置
 
-在项目根目录创建 `.env` 文件，配置以下环境变量：
+在项目根目录创建 `.env` 文件：
 
 ```env
 # Confluence 配置
@@ -148,58 +175,42 @@ REJECT_UNAUTHORIZED=true
 > - Mac 用户主目录通常在 `/Users/your-username/`
 > - Linux 用户主目录通常在 `/home/your-username/`
 
-### 配置项说明
-
-#### Confluence 配置
-- `CONFLUENCE_URL`: Confluence 服务器地址
-- `CONFLUENCE_USERNAME`: Confluence 用户名
-- `CONFLUENCE_PASSWORD`: Confluence 密码
-- `TIMEOUT`: 请求超时时间（毫秒）
-- `REJECT_UNAUTHORIZED`: 是否验证 SSL 证书
-
-#### 服务器配置
-- `PORT`: 服务器端口
-- `NODE_ENV`: 运行环境（development/production）
-- `SERVER_TIMEOUT`: 服务器超时时间（毫秒）
-
-## 使用方法
-
-### 启动服务
+### 开发模式
 
 ```bash
-npm start
+# 监听文件变化并自动编译
+npm run dev
+
+# 监听文件变化并自动重启服务
+npm run dev:start
 ```
 
-### 使用 MCP Inspector 调试
-
-MCP Inspector 是一个用于测试和调试 MCP 服务器的开发工具。您可以使用以下方式启动调试：
+### 构建命令
 
 ```bash
-# 基本用法
-npx @modelcontextprotocol/inspector node dist/index.js
+# 仅构建项目
+npm run build
 
-# 使用环境变量
-npx @modelcontextprotocol/inspector -e CONFLUENCE_URL=your-url -e CONFLUENCE_USERNAME=your-username -e CONFLUENCE_PASSWORD=your-password node dist/index.js
+# 清理构建目录
+npm run clean
 
-# 自定义端口
-CLIENT_PORT=8080 SERVER_PORT=9000 npx @modelcontextprotocol/inspector node dist/index.js
+# 清理并重新构建
+npm run build:clean
 ```
 
-访问 http://localhost:6274 使用可视化界面进行调试。
-
-### 使用 Smithery 运行
-
-本项目支持通过 Smithery 运行，配置文件 `smithery.yaml` 已包含必要的设置：
+### 调试工具
 
 ```bash
-npx @smithery/cli@latest run @enjoyzl/mcp-server-confluence-ts --config '{
-  "confluenceUrl": "your-confluence-url",
-  "confluenceUsername": "your-username",
-  "confluencePassword": "your-password"
-}'
+# 基本调试模式
+npm run inspector
+
+# 开发调试模式（带详细日志）
+npm run inspector:dev
 ```
 
-### API 功能
+## API使用
+
+### 基础API
 
 1. 获取空间信息
 ```typescript
@@ -223,8 +234,6 @@ const content = await confluenceService.getPageContent('PAGE_ID');
 
 ### 高级配置
 
-可以通过传入配置对象来自定义服务行为：
-
 ```typescript
 const confluenceService = new ConfluenceService({
   baseUrl: 'https://your-confluence-url',
@@ -237,20 +246,7 @@ const confluenceService = new ConfluenceService({
 });
 ```
 
-#### 配置选项
-
-- `baseUrl`: Confluence 服务器地址
-- `username`: 用户名
-- `password`: 密码
-- `timeout`: 请求超时时间（毫秒）
-- `maxRedirects`: 最大重定向次数（默认 5）
-- `keepAlive`: 是否启用连接复用（默认 true）
-- `maxContentLength`: 最大响应内容大小（默认 10MB）
-- `rejectUnauthorized`: 是否验证 SSL 证书（默认 true）
-
 ## 性能优化
-
-服务内置了多项性能优化措施：
 
 1. 连接优化
    - 启用 HTTP Keep-Alive
@@ -269,48 +265,10 @@ const confluenceService = new ConfluenceService({
 
 ## 调试指南
 
-### UI 模式（推荐）
-
-使用 MCP Inspector 的可视化界面进行调试：
-
-1. 启动调试服务器：
-```bash
-npx @modelcontextprotocol/inspector node dist/index.js
-```
-
-2. 在浏览器中访问 http://localhost:6274
-
-3. 可用功能：
-   - 工具测试：可视化参数输入和响应查看
-   - 请求历史：查看所有请求记录
-   - 实时通知：显示服务器状态变化
-   - 错误可视化：直观展示错误信息
-
-### CLI 模式
-
-适用于自动化测试和脚本集成：
-
-```bash
-# 列出可用工具
-npx @modelcontextprotocol/inspector --cli node dist/index.js --method tools/list
-
-# 测试特定工具
-npx @modelcontextprotocol/inspector --cli node dist/index.js --method tools/call --tool-name getSpace --tool-arg spaceKey=TEST
-
-# 带环境变量的测试
-npx @modelcontextprotocol/inspector --cli -e CONFLUENCE_URL=your-url node dist/index.js --method tools/call --tool-name getPage --tool-arg pageId=123456
-```
-
-## 日志
+### 日志输出
 
 服务使用结构化日志输出，包含以下信息：
 
-- 请求/响应详情
-- 执行时间统计
-- 错误信息
-- 调试信息
-
-日志格式示例：
 ```json
 {
   "jsonrpc": "2.0",
@@ -324,13 +282,6 @@ npx @modelcontextprotocol/inspector --cli -e CONFLUENCE_URL=your-url node dist/i
 ```
 
 ## 错误处理
-
-服务会处理以下类型的错误：
-
-- 网络错误
-- 认证错误
-- API 错误
-- 超时错误
 
 错误响应格式：
 ```typescript
