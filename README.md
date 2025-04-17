@@ -157,11 +157,13 @@ REJECT_UNAUTHORIZED=true
 {
   "mcpServers": {
     "mcp-server-confluence-ts": {
-      "command": "bash",
-      "args": [
-        "-c",
-        "cd /Users/your-username/workspace/mcp/mcp-server-confluence-ts && node dist/index.js"
-      ]
+      "command": "node",
+      "args": ["/Users/your-username/workspace/code/mcp/mcp-server-confluence-ts/dist/index.js"],
+      "env": {
+        "CONFLUENCE_URL": "your-confluence-url",
+        "CONFLUENCE_USERNAME": "youraccount",
+        "CONFLUENCE_PASSWORD": "yourpwd",
+      }
     }
   }
 }
