@@ -97,6 +97,35 @@ async function main() {
     );
 
     server.tool(
+      "getPageByPrettyUrl",
+      { 
+        spaceKey: z.string(),
+        title: z.string()
+      },
+      async ({ spaceKey, title }) => {
+        try {
+          logger.debug(`调用 getPageByPrettyUrl 工具，参数: ${spaceKey}, ${title}`);
+          const page = await confluenceService.getPageByPrettyUrl({ spaceKey, title });
+          return {
+            content: [{ 
+              type: "text",
+              text: JSON.stringify(page, null, 2)
+            }]
+          };
+        } catch (error) {
+          const err = error as ErrorResponse;
+          return {
+            content: [{
+              type: "text",
+              text: `获取页面信息失败: ${err.message}`
+            }],
+            isError: true
+          };
+        }
+      }
+    );
+
+    server.tool(
       "searchContent",
       { query: z.string() },
       async ({ query }) => {

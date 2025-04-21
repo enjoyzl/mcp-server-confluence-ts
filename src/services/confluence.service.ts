@@ -128,6 +128,36 @@ export class ConfluenceService {
   }
 
   /**
+   * 通过 Pretty URL 格式获取页面
+   */
+  public async getPageByPrettyUrl(request: { spaceKey: string; title: string }): Promise<ConfluencePage> {
+    const { spaceKey, title } = request;
+    if (!spaceKey || !title) {
+      throw new Error('Space key and title are required');
+    }
+
+    const cacheKey = `page:${spaceKey}:${title}`;
+    return this.getCachedData(
+      cacheKey,
+      () => this.retryOperation(async () => {
+        this.logger.debug('Getting page by Pretty URL:', { spaceKey, title });
+        const searchResult = await this.searchContent(`type = page AND space = "${spaceKey}" AND title = "${title}"`);
+        
+        if (!searchResult.results || searchResult.results.length === 0) {
+          throw new Error(`Page not found: /display/${spaceKey}/${title}`);
+        }
+
+        const pageId = searchResult.results[0].id;
+        if (!pageId) {
+          throw new Error(`Invalid search result for page: /display/${spaceKey}/${title}`);
+        }
+
+        return this.getPageContent(pageId);
+      })
+    );
+  }
+
+  /**
    * 批量获取页面信息
    */
   public async getPages(pageIds: string[]): Promise<ConfluencePage[]> {

@@ -49,22 +49,49 @@ export interface ConfluencePage {
   };
 }
 
-// 搜索结果
-export interface SearchResult {
-  results: Array<{
-    content: ConfluencePage;
-    title: string;
-    excerpt: string;
-    url: string;
-    resultGlobalContainer: {
-      title: string;
-      displayUrl: string;
+// 搜索结果项
+export interface SearchResultItem {
+  id: string;
+  type: string;
+  status: string;
+  title: string;
+  space: ConfluenceSpace;
+  history?: {
+    latest: boolean;
+    createdBy: {
+      username: string;
+      displayName: string;
     };
-  }>;
+    createdDate: string;
+  };
+  version?: {
+    number: number;
+    by: {
+      username: string;
+      displayName: string;
+    };
+    when: string;
+    message?: string;
+  };
+  _links: {
+    webui: string;
+    self: string;
+    [key: string]: string;
+  };
+  _expandable?: {
+    [key: string]: string;
+  };
+}
+
+// 搜索结果接口
+export interface SearchResult {
+  results: SearchResultItem[];
   start: number;
   limit: number;
   size: number;
-  totalSize: number;
+  totalSize?: number;
+  cqlQuery?: string;
+  searchDuration?: number;
   _links: {
     base: string;
     context: string;
