@@ -26,6 +26,15 @@ export interface ConfluencePage {
   status: string;
   title: string;
   space: ConfluenceSpace;
+  version?: {
+    number: number;
+    by: {
+      username: string;
+      displayName: string;
+    };
+    when: string;
+    message?: string;
+  };
   body?: {
     storage: {
       value: string;
@@ -74,4 +83,22 @@ export interface ErrorResponse {
     params?: any;
     headers?: Record<string, any>;
   };
+}
+
+// 创建页面请求参数
+export interface CreatePageRequest {
+  spaceKey: string;
+  title: string;
+  content: string;
+  parentId?: string;
+  representation?: 'storage' | 'wiki' | 'editor2' | 'view';
+}
+
+// 更新页面请求参数
+export interface UpdatePageRequest {
+  id: string;
+  title?: string;
+  content?: string;
+  version?: number;
+  representation?: 'storage' | 'wiki' | 'editor2' | 'view';
 } 

@@ -148,6 +148,82 @@ async function main() {
       }
     );
 
+    server.tool(
+      "createPage",
+      {
+        spaceKey: z.string(),
+        title: z.string(),
+        content: z.string(),
+        parentId: z.string().optional(),
+        representation: z.enum(['storage', 'wiki', 'editor2', 'view']).optional()
+      },
+      async ({ spaceKey, title, content, parentId, representation }) => {
+        try {
+          logger.debug(`调用 createPage 工具，参数:`, { spaceKey, title, parentId });
+          const page = await confluenceService.createPage({
+            spaceKey,
+            title,
+            content,
+            parentId,
+            representation
+          });
+          return {
+            content: [{ 
+              type: "text",
+              text: JSON.stringify(page, null, 2)
+            }]
+          };
+        } catch (error) {
+          const err = error as ErrorResponse;
+          return {
+            content: [{
+              type: "text",
+              text: `创建页面失败: ${err.message}`
+            }],
+            isError: true
+          };
+        }
+      }
+    );
+
+    server.tool(
+      "updatePage",
+      {
+        id: z.string(),
+        title: z.string().optional(),
+        content: z.string().optional(),
+        version: z.number().optional(),
+        representation: z.enum(['storage', 'wiki', 'editor2', 'view']).optional()
+      },
+      async ({ id, title, content, version, representation }) => {
+        try {
+          logger.debug(`调用 updatePage 工具，参数:`, { id, title });
+          const page = await confluenceService.updatePage({
+            id,
+            title,
+            content,
+            version,
+            representation
+          });
+          return {
+            content: [{ 
+              type: "text",
+              text: JSON.stringify(page, null, 2)
+            }]
+          };
+        } catch (error) {
+          const err = error as ErrorResponse;
+          return {
+            content: [{
+              type: "text",
+              text: `更新页面失败: ${err.message}`
+            }],
+            isError: true
+          };
+        }
+      }
+    );
+
     // 创建传输层
     const transport = new StdioServerTransport();
 

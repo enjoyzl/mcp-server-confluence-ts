@@ -3,7 +3,9 @@ import {
   ConfluenceSpace, 
   ConfluencePage, 
   SearchResult,
-  ErrorResponse 
+  ErrorResponse,
+  CreatePageRequest,
+  UpdatePageRequest
 } from '../types/confluence.types.js';
 import { ConfluenceClient, ConfluenceClientConfig } from './confluence-client.js';
 
@@ -234,5 +236,79 @@ export class ConfluenceService {
 
     this.logger.error('Confluence API Error:', response);
     throw response;
+  }
+
+  /**
+   * 创建 Confluence 页面
+   */
+  public async createPage(request: CreatePageRequest): Promise<ConfluencePage> {
+    const { spaceKey, title, content, parentId, representation = 'storage' } = request;
+
+    if (!spaceKey || !title || !content) {
+      throw new Error('Space key, title and content are required');
+    }
+
+    return this.retryOperation(async () => {
+      this.logger.debug('Creating page:', { spaceKey, title });
+      
+      const data = {
+        type: 'page',
+        title,
+        space: { key: spaceKey },
+        body: {
+          [representation]: {
+            value: content,
+            representation
+          }
+        },
+        ...(parentId && { ancestors: [{ id: parentId }] })
+      };
+
+      const response = await this.client.post('/rest/api/content', data);
+      return response.data;
+    });
+  }
+
+  /**
+   * 更新 Confluence 页面
+   */
+  public async updatePage(request: UpdatePageRequest): Promise<ConfluencePage> {
+    const { id, title, content, version, representation = 'storage' } = request;
+
+    if (!id) {
+      throw new Error('Page ID is required');
+    }
+
+    // 获取当前页面信息
+    const currentPage = await this.getPage(id);
+    const currentVersion = currentPage.version?.number || 1;
+
+    return this.retryOperation(async () => {
+      this.logger.debug('Updating page:', { id, title });
+
+      const data = {
+        type: 'page',
+        title: title || currentPage.title,
+        version: {
+          number: version || currentVersion + 1
+        },
+        ...(content && {
+          body: {
+            [representation]: {
+              value: content,
+              representation
+            }
+          }
+        })
+      };
+
+      const response = await this.client.put(`/rest/api/content/${id}`, data);
+      
+      // 清除缓存
+      this.cache.delete(`page:${id}`);
+      this.cache.delete(`page-content:${id}`);
+      
+      return response.data;
+    });
   }
 } 
