@@ -19,6 +19,8 @@
   - 获取页面内容
   - 搜索内容
   - 获取页面详细信息
+  - 通过 Pretty URL 获取页面信息
+  - 创建和更新页面
 - 内置性能优化
   - HTTP 连接复用
   - 响应压缩
@@ -224,12 +226,39 @@ const space = await confluenceService.getSpace('SPACE_KEY');
 const page = await confluenceService.getPage('PAGE_ID');
 ```
 
-3. 搜索内容
+3. 通过 Pretty URL 获取页面
+```typescript
+const page = await confluenceService.getPageByPrettyUrl('SPACE_KEY', 'PAGE_TITLE');
+```
+
+4. 创建页面
+```typescript
+const newPage = await confluenceService.createPage({
+  spaceKey: 'SPACE_KEY',
+  title: 'Page Title',
+  content: 'Page Content',
+  parentId: 'PARENT_PAGE_ID', // 可选
+  representation: 'storage' // 可选，默认为 'storage'
+});
+```
+
+5. 更新页面
+```typescript
+const updatedPage = await confluenceService.updatePage({
+  id: 'PAGE_ID',
+  title: 'Updated Title', // 可选
+  content: 'Updated Content', // 可选
+  version: 2, // 页面版本号
+  representation: 'storage' // 可选，默认为 'storage'
+});
+```
+
+6. 搜索内容
 ```typescript
 const results = await confluenceService.searchContent('search query');
 ```
 
-4. 获取页面详细内容
+7. 获取页面详细内容
 ```typescript
 const content = await confluenceService.getPageContent('PAGE_ID');
 ```
