@@ -13,8 +13,9 @@ declare module 'axios' {
 
 export interface ConfluenceClientConfig {
   baseUrl: string;
-  username: string;
-  password: string;
+  username?: string;
+  password?: string;
+  accessToken?: string;
   timeout?: number;
   rejectUnauthorized?: boolean;
   maxRedirects?: number;
@@ -32,7 +33,14 @@ export class ConfluenceClient {
   constructor(config: ConfluenceClientConfig) {
     this.logger = Logger.getInstance();
     
-    const auth = Buffer.from(`${config.username}:${config.password}`).toString('base64');
+    let authHeader: string;
+    if (config.accessToken) {
+      authHeader = `Bearer ${config.accessToken}`;
+    } else if (config.username && config.password) {
+      authHeader = `Basic ${Buffer.from(`${config.username}:${config.password}`).toString('base64')}`;
+    } else {
+      throw new Error('Either accessToken or username/password must be provided');
+    }
     
     // 创建 HTTPS Agent 实例
     const httpsAgent = new https.Agent({
@@ -48,17 +56,17 @@ export class ConfluenceClient {
     this.axios = axios.create({
       baseURL: config.baseUrl,
       timeout: config.timeout || 10000,
-      maxRedirects: config.maxRedirects || 5, // 降低最大重定向次数
-      maxContentLength: config.maxContentLength || 10 * 1024 * 1024, // 默认最大内容长度为 10MB
+      maxRedirects: config.maxRedirects || 5,
+      maxContentLength: config.maxContentLength || 10 * 1024 * 1024,
       httpsAgent,
       headers: {
-        'Authorization': `Basic ${auth}`,
+        'Authorization': authHeader,
         'Content-Type': 'application/json',
         'Accept': 'application/json',
         'Connection': config.keepAlive ? 'keep-alive' : 'close'
       },
-      decompress: true, // 启用响应解压缩
-      validateStatus: (status) => status >= 200 && status < 300 // 只接受 2xx 的响应状态
+      decompress: true,
+      validateStatus: (status) => status >= 200 && status < 300
     });
 
     // 请求拦截器

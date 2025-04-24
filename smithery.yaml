@@ -12,14 +12,25 @@ startCommand:
         },
         "confluenceUsername": {
           "type": "string",
-          "description": "Confluence username"
+          "description": "Confluence username (required if accessToken is not provided)"
         },
         "confluencePassword": {
           "type": "string",
-          "description": "Confluence password"
+          "description": "Confluence password (required if accessToken is not provided)"
+        },
+        "confluenceAccessToken": {
+          "type": "string",
+          "description": "Confluence access token (can be used instead of username/password)"
         }
       },
-      "required": ["confluenceUrl", "confluenceUsername", "confluencePassword"]
+      "anyOf": [
+        {
+          "required": ["confluenceUrl", "confluenceAccessToken"]
+        },
+        {
+          "required": ["confluenceUrl", "confluenceUsername", "confluencePassword"]
+        }
+      ]
     }
   commandFunction: |-
     (config) => ({
@@ -28,6 +39,7 @@ startCommand:
       "env": {
         "CONFLUENCE_URL": config.confluenceUrl,
         "CONFLUENCE_USERNAME": config.confluenceUsername,
-        "CONFLUENCE_PASSWORD": config.confluencePassword
+        "CONFLUENCE_PASSWORD": config.confluencePassword,
+        "CONFLUENCE_ACCESS_TOKEN": config.confluenceAccessToken
       }
     }) 

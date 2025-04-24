@@ -39,6 +39,7 @@ async function main() {
       baseUrl: config.baseUrl,
       username: config.username,
       password: config.password,
+      accessToken: config.accessToken,
       timeout: config.timeout,
       rejectUnauthorized: config.rejectUnauthorized
     });

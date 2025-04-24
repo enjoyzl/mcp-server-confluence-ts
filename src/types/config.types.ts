@@ -16,8 +16,9 @@ export interface AppConfig extends ConfluenceConfig {
 export interface EnvConfig {
   confluence: {
     url: string;
-    username: string;
-    password: string;
+    username?: string;
+    password?: string;
+    accessToken?: string;
   };
   server: {
     port: number;

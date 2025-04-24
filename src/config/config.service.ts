@@ -20,6 +20,7 @@ const configSchema = z.object({
   baseUrl: z.string().url(),
   username: z.string().min(1),
   password: z.string().min(1),
+  accessToken: z.string().optional(),
   timeout: z.number().int().positive().optional(),
   rejectUnauthorized: z.boolean().optional(),
   server: serverSchema
@@ -67,6 +68,7 @@ export class ConfigService {
         baseUrl: process.env.CONFLUENCE_URL,
         username: process.env.CONFLUENCE_USERNAME,
         password: process.env.CONFLUENCE_PASSWORD,
+        accessToken: process.env.CONFLUENCE_ACCESS_TOKEN,
         timeout: process.env.TIMEOUT ? parseInt(process.env.TIMEOUT) : undefined,
         rejectUnauthorized: process.env.REJECT_UNAUTHORIZED !== 'false',
         server: {
@@ -75,6 +77,11 @@ export class ConfigService {
           timeout: parseInt(process.env.SERVER_TIMEOUT || '10000')
         }
       });
+
+      // 验证认证信息
+      if (!config.accessToken && (!config.username || !config.password)) {
+        throw new Error('Either CONFLUENCE_ACCESS_TOKEN or both CONFLUENCE_USERNAME and CONFLUENCE_PASSWORD must be provided');
+      }
 
       logger.debug('Configuration loaded successfully');
       return config;

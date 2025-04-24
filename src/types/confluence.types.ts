@@ -1,8 +1,9 @@
 // Confluence API 配置
 export interface ConfluenceConfig {
   baseUrl: string;
-  username: string;
-  password: string;
+  username?: string;
+  password?: string;
+  accessToken?: string;
   timeout?: number;
   rejectUnauthorized?: boolean;
 }

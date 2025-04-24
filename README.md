@@ -14,6 +14,9 @@
 
 ## 功能特性
 
+- 支持多种认证方式
+  - Access Token 认证（推荐）
+  - 用户名密码认证
 - 支持基本的 Confluence API 操作
   - 获取空间信息
   - 获取页面内容
@@ -60,16 +63,32 @@ npm start
 
 ## 配置说明
 
-### 环境变量配置
+### 认证配置
 
-在项目根目录创建 `.env` 文件：
+服务支持两种认证方式，你可以选择其中一种：
+
+#### 1. Access Token 认证（推荐）
+
+在 `.env` 文件中配置：
 
 ```env
-# Confluence 配置
+CONFLUENCE_URL=https://your-confluence-url
+CONFLUENCE_ACCESS_TOKEN=your-access-token
+```
+
+#### 2. 用户名密码认证
+
+在 `.env` 文件中配置：
+
+```env
 CONFLUENCE_URL=https://your-confluence-url
 CONFLUENCE_USERNAME=your-username
 CONFLUENCE_PASSWORD=your-password
+```
 
+### 其他配置项
+
+```env
 # 服务器配置
 PORT=3000
 NODE_ENV=development
@@ -263,19 +282,21 @@ const results = await confluenceService.searchContent('search query');
 const content = await confluenceService.getPageContent('PAGE_ID');
 ```
 
-### 高级配置
+## 安全建议
 
-```typescript
-const confluenceService = new ConfluenceService({
-  baseUrl: 'https://your-confluence-url',
-  username: 'your-username',
-  password: 'your-password',
-  timeout: 10000,
-  maxRedirects: 5,
-  keepAlive: true,
-  maxContentLength: 10 * 1024 * 1024 // 10MB
-});
-```
+1. 优先使用 Access Token 认证方式，这样更安全
+2. 定期轮换 Access Token
+3. 不要在代码中硬编码认证信息
+4. 确保 `.env` 文件已添加到 `.gitignore` 中
+5. 在生产环境中使用环境变量或安全的配置管理系统
+6. 如果同时配置了两种认证方式，系统会优先使用 Access Token
+
+## 注意事项
+
+1. Access Token 和用户名密码认证方式只能选择其中一种
+2. 如果同时配置了两种认证方式，系统会优先使用 Access Token
+3. 确保配置的 URL 是正确的 Confluence API 地址
+4. 在生产环境中建议使用 HTTPS
 
 ## 性能优化
 
