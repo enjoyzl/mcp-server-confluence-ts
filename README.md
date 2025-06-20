@@ -18,23 +18,17 @@
   - Access Token 认证（推荐）
   - 用户名密码认证
 - 支持基本的 Confluence API 操作
-  - 获取空间信息
-  - 获取页面内容
-  - 搜索内容
-  - 获取页面详细信息
-  - 通过 Pretty URL 获取页面信息
-  - 创建和更新页面
-  - **评论管理功能**
-    - 获取页面评论
-    - 创建评论和回复
-    - 更新评论
-    - 删除评论
-    - 搜索评论
-  - **行内评论功能**
-    - 对页面特定文本创建行内评论
-    - 更新和删除行内评论
-    - 智能文本定位和高亮
-    - 支持回复行内评论
+  - **统一页面管理**
+    - 创建、更新、删除页面
+    - 获取页面信息和内容
+    - 通过 Pretty URL 获取页面
+  - **统一评论管理**
+    - 普通评论：创建、更新、删除、回复
+    - 行内评论：创建、更新、删除、回复
+    - 获取页面评论和搜索评论
+  - **内容搜索和空间管理**
+    - 全文搜索内容
+    - 获取空间信息
 - 内置性能优化
   - HTTP 连接复用
   - 响应压缩
@@ -460,6 +454,30 @@ interface ErrorResponse {
   };
 }
 ```
+
+## 工具列表
+
+### 页面管理（已合并）
+- `managePages` - 统一页面管理（创建、更新、删除、获取）
+- `getPageByPrettyUrl` - 通过Pretty URL获取页面（特殊用途）
+- `searchContent` - 搜索内容
+- `getSpace` - 获取空间信息
+
+### 评论管理（已合并）
+- `manageComments` - 统一评论管理（创建、更新、删除、回复）
+- `getPageComments` - 获取页面评论
+- `getComment` - 获取单个评论  
+- `searchComments` - 搜索评论
+
+## 文档
+
+- [MCP Inspector 调试参数指南](docs/DEBUG-PARAMETER-GUIDE.md) ⭐️ **新增**
+- [页面管理功能使用指南](docs/pages-management-example.md)
+- [评论功能使用指南](docs/comments-merged-example.md)
+- [搜索功能故障排除](docs/SEARCH-TROUBLESHOOTING.md)
+- [行内评论示例](docs/inline-comments-example.md)
+- [Confluence 7.4 兼容性](docs/CONFLUENCE-7.4-COMPATIBILITY.md)
+- [故障排除](docs/CONFLUENCE-7.4-TROUBLESHOOTING.md)
 
 ## 贡献
 

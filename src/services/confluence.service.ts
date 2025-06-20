@@ -423,6 +423,28 @@ export class ConfluenceService {
   }
 
   /**
+   * 删除 Confluence 页面
+   */
+  public async deletePage(pageId: string): Promise<void> {
+    if (!pageId) {
+      throw new Error('Page ID is required');
+    }
+
+    return this.retryOperation(async () => {
+      this.logger.debug('Deleting page:', pageId);
+      
+      // 删除页面
+      await this.client.delete(`/rest/api/content/${pageId}`);
+      
+      // 清除相关缓存
+      this.cache.delete(`page:${pageId}`);
+      this.cache.delete(`page-content:${pageId}`);
+      
+      this.logger.info('Page deleted successfully:', pageId);
+    });
+  }
+
+  /**
    * 获取页面评论
    */
   public async getPageComments(

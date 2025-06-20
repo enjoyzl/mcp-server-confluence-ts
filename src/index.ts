@@ -47,7 +47,7 @@ async function main() {
     // 注册工具
     server.tool(
       "getSpace",
-      { spaceKey: z.string() },
+      { spaceKey: z.string().describe('空间Key（如：DEV, TECH, DOC 等）') },
       async ({ spaceKey }) => {
         try {
           logger.debug(`调用 getSpace 工具，参数: ${spaceKey}`);
@@ -71,37 +71,12 @@ async function main() {
       }
     );
 
-    server.tool(
-      "getPage",
-      { pageId: z.string() },
-      async ({ pageId }) => {
-        try {
-          logger.debug(`调用 getPage 工具，参数: ${pageId}`);
-          const page = await confluenceService.getPage(pageId);
-          return {
-            content: [{ 
-              type: "text",
-              text: JSON.stringify(page, null, 2)
-            }]
-          };
-        } catch (error) {
-          const err = error as ErrorResponse;
-          return {
-            content: [{
-              type: "text",
-              text: `获取页面信息失败: ${err.message}`
-            }],
-            isError: true
-          };
-        }
-      }
-    );
-
+    // 保留独立的特殊用途工具
     server.tool(
       "getPageByPrettyUrl",
       { 
-        spaceKey: z.string(),
-        title: z.string()
+        spaceKey: z.string().describe('空间Key（如：DEV, TECH 等）'),
+        title: z.string().describe('页面标题（精确匹配）')
       },
       async ({ spaceKey, title }) => {
         try {
@@ -128,7 +103,7 @@ async function main() {
 
     server.tool(
       "searchContent",
-      { query: z.string() },
+      { query: z.string().describe('搜索关键词（支持中文和英文，将自动转换为CQL格式）') },
       async ({ query }) => {
         try {
           logger.debug(`调用 searchContent 工具，参数: ${query}`);
@@ -153,54 +128,84 @@ async function main() {
     );
 
     server.tool(
-      "getPageContent",
-      { pageId: z.string() },
-      async ({ pageId }) => {
-        try {
-          logger.debug(`调用 getPageContent 工具，参数: ${pageId}`);
-          const content = await confluenceService.getPageContent(pageId);
-          return {
-            content: [{ 
-              type: "text",
-              text: JSON.stringify(content, null, 2)
-            }]
-          };
-        } catch (error) {
-          const err = error as ErrorResponse;
-          return {
-            content: [{
-              type: "text",
-              text: `获取页面内容失败: ${err.message}`
-            }],
-            isError: true
-          };
-        }
-      }
-    );
-
-    server.tool(
-      "createPage",
+      "managePages",
       {
-        spaceKey: z.string(),
-        title: z.string(),
-        content: z.string(),
-        parentId: z.string().optional(),
-        representation: z.enum(['storage', 'wiki', 'editor2', 'view']).optional()
+        action: z.enum(['create', 'update', 'delete', 'get', 'getContent']).describe('操作类型: create=创建页面, update=更新页面, delete=删除页面, get=获取页面基本信息, getContent=获取页面详细内容'),
+        // 通用参数
+        pageId: z.string().optional().describe('页面ID（用于update/delete/get/getContent操作）'),
+        spaceKey: z.string().optional().describe('空间Key（用于create操作，必填）'),
+        title: z.string().optional().describe('页面标题（用于create操作必填，update操作可选）'),
+        content: z.string().optional().describe('页面内容（用于create操作必填，update操作可选）'),
+        // 创建/更新页面参数
+        parentId: z.string().optional().describe('父页面ID（可选，用于创建子页面）'),
+        representation: z.enum(['storage', 'wiki', 'editor2', 'view']).optional().describe('内容格式: storage=HTML存储格式（推荐）, wiki=Wiki标记语法, editor2=编辑器格式, view=查看格式'),
+        version: z.number().optional().describe('页面版本号（用于update操作，建议填写以避免冲突）'),
+        // 获取页面参数
+        expand: z.string().optional().describe('扩展参数（可选，用于指定返回额外信息，如：body.storage,version,space）')
       },
-      async ({ spaceKey, title, content, parentId, representation }) => {
+      async ({ action, pageId, spaceKey, title, content, parentId, representation, version, expand }) => {
         try {
-          logger.debug(`调用 createPage 工具，参数:`, { spaceKey, title, parentId });
-          const page = await confluenceService.createPage({
-            spaceKey,
-            title,
-            content,
-            parentId,
-            representation
-          });
+          logger.debug(`调用 managePages 工具，参数:`, { action, pageId, spaceKey, title });
+          
+          let result: any;
+          
+          switch (action) {
+            case 'create':
+              if (!spaceKey || !title || !content) {
+                throw new Error('创建页面需要 spaceKey、title 和 content 参数');
+              }
+              result = await confluenceService.createPage({
+                spaceKey,
+                title,
+                content,
+                parentId,
+                representation
+              });
+              break;
+              
+            case 'update':
+              if (!pageId) {
+                throw new Error('更新页面需要 pageId 参数');
+              }
+              result = await confluenceService.updatePage({
+                id: pageId,
+                title,
+                content,
+                version,
+                representation
+              });
+              break;
+              
+            case 'delete':
+              if (!pageId) {
+                throw new Error('删除页面需要 pageId 参数');
+              }
+              await confluenceService.deletePage(pageId);
+              result = { message: `页面 ${pageId} 已成功删除` };
+              break;
+              
+            case 'get':
+              if (!pageId) {
+                throw new Error('获取页面需要 pageId 参数');
+              }
+              result = await confluenceService.getPage(pageId);
+              break;
+              
+            case 'getContent':
+              if (!pageId) {
+                throw new Error('获取页面内容需要 pageId 参数');
+              }
+              result = await confluenceService.getPageContent(pageId);
+              break;
+              
+            default:
+              throw new Error(`不支持的操作: ${action}`);
+          }
+          
           return {
             content: [{ 
               type: "text",
-              text: JSON.stringify(page, null, 2)
+              text: JSON.stringify(result, null, 2)
             }]
           };
         } catch (error) {
@@ -208,45 +213,7 @@ async function main() {
           return {
             content: [{
               type: "text",
-              text: `创建页面失败: ${err.message}`
-            }],
-            isError: true
-          };
-        }
-      }
-    );
-
-    server.tool(
-      "updatePage",
-      {
-        id: z.string(),
-        title: z.string().optional(),
-        content: z.string().optional(),
-        version: z.number().optional(),
-        representation: z.enum(['storage', 'wiki', 'editor2', 'view']).optional()
-      },
-      async ({ id, title, content, version, representation }) => {
-        try {
-          logger.debug(`调用 updatePage 工具，参数:`, { id, title });
-          const page = await confluenceService.updatePage({
-            id,
-            title,
-            content,
-            version,
-            representation
-          });
-          return {
-            content: [{ 
-              type: "text",
-              text: JSON.stringify(page, null, 2)
-            }]
-          };
-        } catch (error) {
-          const err = error as ErrorResponse;
-          return {
-            content: [{
-              type: "text",
-              text: `更新页面失败: ${err.message}`
+              text: `页面操作失败: ${err.message}`
             }],
             isError: true
           };
@@ -258,22 +225,22 @@ async function main() {
     server.tool(
       "manageComments",
       {
-        action: z.enum(['create', 'update', 'delete', 'reply']),
-        commentType: z.enum(['regular', 'inline']).optional(),
+        action: z.enum(['create', 'update', 'delete', 'reply']).describe('操作类型: create=创建评论, update=更新评论, delete=删除评论, reply=回复评论'),
+        commentType: z.enum(['regular', 'inline']).optional().describe('评论类型: regular=普通评论（默认）, inline=行内评论'),
         // 通用参数
-        pageId: z.string().optional(),
-        commentId: z.string().optional(),
-        content: z.string().optional(),
+        pageId: z.string().optional().describe('页面ID（用于create/reply操作时必填）'),
+        commentId: z.string().optional().describe('评论ID（用于update/delete操作必填，行内评论reply时必填）'),
+        content: z.string().optional().describe('评论内容（用于create/update/reply操作必填）'),
         // 普通评论参数
-        representation: z.enum(['storage', 'wiki', 'editor2', 'view']).optional(),
-        parentCommentId: z.string().optional(),
-        version: z.number().optional(),
-        watch: z.boolean().optional(),
+        representation: z.enum(['storage', 'wiki', 'editor2', 'view']).optional().describe('内容格式: storage=HTML存储格式（推荐）, wiki=Wiki标记语法, editor2=编辑器格式, view=查看格式'),
+        parentCommentId: z.string().optional().describe('父评论ID（用于普通评论的reply操作必填，或创建子评论）'),
+        version: z.number().optional().describe('评论版本号（用于update操作，建议填写以避免冲突）'),
+        watch: z.boolean().optional().describe('是否监视评论（布尔值，默认false，用于reply操作）'),
         // 行内评论参数
-        originalSelection: z.string().optional(),
-        matchIndex: z.number().optional(),
-        numMatches: z.number().optional(),
-        serializedHighlights: z.string().optional()
+        originalSelection: z.string().optional().describe('原始选中文本（用于创建行内评论时必填）'),
+        matchIndex: z.number().optional().describe('匹配索引（当页面有多个相同文本时指定第几个，默认0）'),
+        numMatches: z.number().optional().describe('匹配总数（页面中相同文本的总数，默认1）'),
+        serializedHighlights: z.string().optional().describe('序列化高亮信息（JSON格式字符串，可选）')
       },
       async ({ action, commentType = 'regular', pageId, commentId, content, representation, parentCommentId, version, watch, originalSelection, matchIndex, numMatches, serializedHighlights }) => {
         try {
@@ -394,9 +361,9 @@ async function main() {
     server.tool(
       "getPageComments",
       {
-        pageId: z.string(),
-        start: z.number().optional(),
-        limit: z.number().optional()
+        pageId: z.string().describe('页面ID'),
+        start: z.number().optional().describe('起始位置（分页参数，默认0）'),
+        limit: z.number().optional().describe('每页数量（分页参数，默认25）')
       },
       async ({ pageId, start, limit }) => {
         try {
@@ -423,7 +390,7 @@ async function main() {
 
     server.tool(
       "getComment",
-      { commentId: z.string() },
+      { commentId: z.string().describe('评论ID') },
       async ({ commentId }) => {
         try {
           logger.debug(`调用 getComment 工具，参数: ${commentId}`);
@@ -450,10 +417,10 @@ async function main() {
     server.tool(
       "searchComments",
       {
-        query: z.string(),
-        start: z.number().optional(),
-        limit: z.number().optional(),
-        spaceKey: z.string().optional()
+        query: z.string().describe('搜索关键词（在评论内容中搜索）'),
+        start: z.number().optional().describe('起始位置（分页参数，默认0）'),
+        limit: z.number().optional().describe('每页数量（分页参数，默认25）'),
+        spaceKey: z.string().optional().describe('限定搜索的空间Key（可选）')
       },
       async ({ query, start, limit, spaceKey }) => {
         try {
