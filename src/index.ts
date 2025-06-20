@@ -44,7 +44,10 @@ async function main() {
       rejectUnauthorized: config.rejectUnauthorized
     });
 
-    // 注册工具
+    // ===========================================
+    // 1. 基础信息工具 - 最常用的查询功能
+    // ===========================================
+    
     server.tool(
       "getSpace",
       { spaceKey: z.string().describe('空间Key（如：DEV, TECH, DOC 等）') },
@@ -71,7 +74,6 @@ async function main() {
       }
     );
 
-    // 保留独立的特殊用途工具
     server.tool(
       "getPageByPrettyUrl",
       { 
@@ -101,32 +103,10 @@ async function main() {
       }
     );
 
-    server.tool(
-      "searchContent",
-      { query: z.string().describe('搜索关键词（支持中文和英文，将自动转换为CQL格式）') },
-      async ({ query }) => {
-        try {
-          logger.debug(`调用 searchContent 工具，参数: ${query}`);
-          const results = await confluenceService.searchContent(query);
-          return {
-            content: [{ 
-              type: "text",
-              text: JSON.stringify(results, null, 2)
-            }]
-          };
-        } catch (error) {
-          const err = error as ErrorResponse;
-          return {
-            content: [{
-              type: "text",
-              text: `搜索内容失败: ${err.message}`
-            }],
-            isError: true
-          };
-        }
-      }
-    );
-
+    // ===========================================
+    // 2. 页面管理工具 - 核心功能
+    // ===========================================
+    
     server.tool(
       "managePages",
       {
@@ -221,7 +201,10 @@ async function main() {
       }
     );
 
-    // 评论相关工具
+    // ===========================================
+    // 3. 评论管理工具 - 扩展功能
+    // ===========================================
+    
     server.tool(
       "manageComments",
       {
@@ -357,7 +340,6 @@ async function main() {
       }
     );
 
-    // 保留独立的获取评论工具，因为它们有不同的用途
     server.tool(
       "getPageComments",
       {
@@ -407,6 +389,36 @@ async function main() {
             content: [{
               type: "text",
               text: `获取评论失败: ${err.message}`
+            }],
+            isError: true
+          };
+        }
+      }
+    );
+
+    // ===========================================
+    // 4. 搜索工具 - 专用搜索功能
+    // ===========================================
+    
+    server.tool(
+      "searchContent",
+      { query: z.string().describe('搜索关键词（支持中文和英文，将自动转换为CQL格式）') },
+      async ({ query }) => {
+        try {
+          logger.debug(`调用 searchContent 工具，参数: ${query}`);
+          const results = await confluenceService.searchContent(query);
+          return {
+            content: [{ 
+              type: "text",
+              text: JSON.stringify(results, null, 2)
+            }]
+          };
+        } catch (error) {
+          const err = error as ErrorResponse;
+          return {
+            content: [{
+              type: "text",
+              text: `搜索内容失败: ${err.message}`
             }],
             isError: true
           };

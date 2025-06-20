@@ -1,8 +1,33 @@
 # MCP Inspector 调试参数指南
 
-## 概述
+## 🚀 概述
 
-现在所有工具的参数都已添加详细的注释说明，在 MCP Inspector 调试页面中可以清楚地看到每个参数的用途和可选值。
+经过架构优化，本服务已完成工具合并和注册顺序优化：
+
+### 🎯 优化成果
+- **工具数量**: 从12个优化为8个（减少33%）
+- **API统一**: 通过action参数区分操作类型
+- **智能验证**: 根据操作自动验证必需参数
+- **完整注释**: 在MCP Inspector中可清楚查看所有参数说明
+
+### 📁 工具分组架构
+```
+📁 1. 基础信息工具（最常用）
+   ├── getSpace
+   └── getPageByPrettyUrl
+
+📁 2. 页面管理工具（核心功能）
+   └── managePages ⭐️
+
+📁 3. 评论管理工具（扩展功能）
+   ├── manageComments ⭐️
+   ├── getPageComments
+   └── getComment
+
+📁 4. 搜索工具（专用搜索）
+   ├── searchContent
+   └── searchComments
+```
 
 ## 🛠️ managePages 工具参数
 

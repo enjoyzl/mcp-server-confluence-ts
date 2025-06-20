@@ -7,36 +7,59 @@
 - [快速开始](#快速开始)
 - [配置说明](#配置说明)
 - [开发指南](#开发指南)
-- [API使用](#api使用)
+- [MCP 工具使用指南](#mcp-工具使用指南)
+- [工具概览](#工具概览)
 - [性能优化](#性能优化)
 - [调试指南](#调试指南)
 - [错误处理](#错误处理)
 
 ## 功能特性
 
-- 支持多种认证方式
-  - Access Token 认证（推荐）
-  - 用户名密码认证
-- 支持基本的 Confluence API 操作
-  - **统一页面管理**
-    - 创建、更新、删除页面
-    - 获取页面信息和内容
-    - 通过 Pretty URL 获取页面
-  - **统一评论管理**
-    - 普通评论：创建、更新、删除、回复
-    - 行内评论：创建、更新、删除、回复
-    - 获取页面评论和搜索评论
-  - **内容搜索和空间管理**
-    - 全文搜索内容
-    - 获取空间信息
-- 内置性能优化
-  - HTTP 连接复用
-  - 响应压缩
-  - 请求超时控制
-- 完善的错误处理和日志记录
-  - 结构化日志输出
-  - 请求耗时统计
-  - 详细的错误信息
+### 🔐 认证方式
+- **Access Token 认证**（推荐）
+- **用户名密码认证**
+- 支持多环境配置
+
+### 🔧 MCP 工具架构（已优化）
+- **工具合并优化**: 从12个工具精简为8个（减少33%）
+- **统一API设计**: 通过action参数区分操作类型
+- **智能参数验证**: 根据操作自动验证必需参数
+- **完整参数注释**: MCP Inspector中可查看详细说明
+
+### 📄 页面管理功能
+- **`managePages`**: 统一页面管理工具 ⭐️
+  - 创建页面（支持父页面和内容格式）
+  - 更新页面（增量更新支持）
+  - **删除页面** ⭐️ **新增功能**
+  - 获取页面基本信息
+  - 获取页面详细内容
+- **`getPageByPrettyUrl`**: 通过标题精确获取页面
+- **`getSpace`**: 获取空间信息
+
+### 💬 评论管理功能  
+- **`manageComments`**: 统一评论管理工具 ⭐️
+  - **普通评论**: 创建、更新、删除、回复
+  - **行内评论**: 创建、更新、删除、回复
+  - 支持评论版本控制和监视
+- **`getPageComments`**: 获取页面所有评论（支持分页）
+- **`getComment`**: 获取单个评论详情
+
+### 🔍 搜索功能
+- **`searchContent`**: 全文搜索内容（支持CQL语法）
+- **`searchComments`**: 搜索评论内容（支持空间限定）
+- **错误回退机制**: CQL语法错误时自动尝试基本搜索
+
+### ⚡ 性能优化
+- **HTTP 连接复用**: Keep-Alive支持
+- **响应压缩**: 自动压缩传输
+- **请求超时控制**: 可配置超时时间
+- **错误重试机制**: 自动重试失败请求
+
+### 📊 日志和监控
+- **结构化日志输出**: JSON格式日志
+- **请求耗时统计**: 性能监控
+- **详细错误信息**: 便于调试
+- **操作记录追踪**: 完整的操作日志
 
 ## 快速开始
 
@@ -236,157 +259,272 @@ npm run inspector
 npm run inspector:dev
 ```
 
-## API使用
+## MCP 工具使用指南
 
-### 基础API
+### 🚀 工具架构优化
 
-1. 获取空间信息
-```typescript
-const space = await confluenceService.getSpace('SPACE_KEY');
+本服务已完成工具架构优化，按功能和使用频率重新组织：
+
+```
+📁 1. 基础信息工具（最常用）
+📁 2. 页面管理工具（核心功能）  
+📁 3. 评论管理工具（扩展功能）
+📁 4. 搜索工具（专用搜索）
 ```
 
-2. 获取页面信息
-```typescript
-const page = await confluenceService.getPage('PAGE_ID');
+### 🔧 MCP 工具列表
+
+#### 1. 基础信息工具 - 最常用的查询功能
+
+**`getSpace`** - 获取空间信息
+```json
+{
+  "name": "getSpace",
+  "arguments": {
+    "spaceKey": "DEV"
+  }
+}
 ```
 
-3. 通过 Pretty URL 获取页面
-```typescript
-const page = await confluenceService.getPageByPrettyUrl('SPACE_KEY', 'PAGE_TITLE');
+**`getPageByPrettyUrl`** - 根据标题精确获取页面  
+```json
+{
+  "name": "getPageByPrettyUrl",
+  "arguments": {
+    "spaceKey": "DEV",
+    "title": "API 开发指南"
+  }
+}
 ```
 
-4. 创建页面
-```typescript
-const newPage = await confluenceService.createPage({
-  spaceKey: 'SPACE_KEY',
-  title: 'Page Title',
-  content: 'Page Content',
-  parentId: 'PARENT_PAGE_ID', // 可选
-  representation: 'storage' // 可选，默认为 'storage'
-});
+#### 2. 页面管理工具 - 核心功能
+
+**`managePages`** - 统一页面管理 ⭐️ **合并优化**
+
+**创建页面：**
+```json
+{
+  "name": "managePages",
+  "arguments": {
+    "action": "create",
+    "spaceKey": "DEV",
+    "title": "新页面标题",
+    "content": "<p>页面内容</p>",
+    "parentId": "123456789",
+    "representation": "storage"
+  }
+}
 ```
 
-5. 更新页面
-```typescript
-const updatedPage = await confluenceService.updatePage({
-  id: 'PAGE_ID',
-  title: 'Updated Title', // 可选
-  content: 'Updated Content', // 可选
-  version: 2, // 页面版本号
-  representation: 'storage' // 可选，默认为 'storage'
-});
+**更新页面：**
+```json
+{
+  "name": "managePages",
+  "arguments": {
+    "action": "update",
+    "pageId": "123456789",
+    "title": "更新的标题",
+    "content": "<p>更新的内容</p>",
+    "version": 2,
+    "representation": "storage"
+  }
+}
 ```
 
-6. 搜索内容
-```typescript
-const results = await confluenceService.searchContent('search query');
+**删除页面：** ⭐️ **新增功能**
+```json
+{
+  "name": "managePages",
+  "arguments": {
+    "action": "delete",
+    "pageId": "123456789"
+  }
+}
 ```
 
-7. 获取页面详细内容
-```typescript
-const content = await confluenceService.getPageContent('PAGE_ID');
+**获取页面基本信息：**
+```json
+{
+  "name": "managePages",
+  "arguments": {
+    "action": "get",
+    "pageId": "123456789"
+  }
+}
 ```
 
-### 评论管理API
-
-8. 获取页面评论
-```typescript
-// 获取页面所有评论
-const comments = await confluenceService.getPageComments('PAGE_ID');
-
-// 分页获取评论
-const comments = await confluenceService.getPageComments('PAGE_ID', { 
-  start: 0, 
-  limit: 10 
-});
+**获取页面详细内容：**
+```json
+{
+  "name": "managePages",
+  "arguments": {
+    "action": "getContent",
+    "pageId": "123456789",
+    "expand": "body.storage,version,space"
+  }
+}
 ```
 
-9. 获取评论详情
-```typescript
-const comment = await confluenceService.getComment('COMMENT_ID');
+#### 3. 评论管理工具 - 扩展功能
+
+**`manageComments`** - 统一评论管理 ⭐️ **合并优化**
+
+**创建普通评论：**
+```json
+{
+  "name": "manageComments",
+  "arguments": {
+    "action": "create",
+    "commentType": "regular",
+    "pageId": "123456789",
+    "content": "这是一条普通评论",
+    "representation": "storage"
+  }
+}
 ```
 
-10. 创建评论
-```typescript
-// 创建普通评论
-const comment = await confluenceService.createComment({
-  pageId: 'PAGE_ID',
-  content: '这是一条评论',
-  representation: 'storage' // 可选，默认为 'storage'
-});
-
-// 回复评论
-const reply = await confluenceService.createComment({
-  pageId: 'PAGE_ID',
-  content: '这是一条回复',
-  parentCommentId: 'PARENT_COMMENT_ID' // 父评论ID
-});
+**创建行内评论：**
+```json
+{
+  "name": "manageComments",
+  "arguments": {
+    "action": "create",
+    "commentType": "inline",
+    "pageId": "123456789",
+    "content": "这里需要注意性能问题",
+    "originalSelection": "QueryHoldingsService.setHoldingData()",
+    "matchIndex": 0,
+    "numMatches": 1
+  }
+}
 ```
 
-11. 更新评论
-```typescript
-const updatedComment = await confluenceService.updateComment({
-  id: 'COMMENT_ID',
-  content: '更新后的评论内容',
-  version: 2, // 评论版本号
-  representation: 'storage' // 可选，默认为 'storage'
-});
+**更新评论：**
+```json
+{
+  "name": "manageComments",
+  "arguments": {
+    "action": "update",
+    "commentType": "regular",
+    "commentId": "98765432",
+    "content": "更新后的评论内容",
+    "version": 2
+  }
+}
 ```
 
-12. 删除评论
-```typescript
-await confluenceService.deleteComment('COMMENT_ID');
+**删除评论：**
+```json
+{
+  "name": "manageComments",
+  "arguments": {
+    "action": "delete",
+    "commentType": "regular",
+    "commentId": "98765432"
+  }
+}
 ```
 
-13. 搜索评论
-```typescript
-// 搜索所有评论
-const searchResults = await confluenceService.searchComments('关键词');
-
-// 在特定空间中搜索评论
-const searchResults = await confluenceService.searchComments('关键词', {
-  spaceKey: 'SPACE_KEY',
-  start: 0,
-  limit: 25
-});
+**回复普通评论：**
+```json
+{
+  "name": "manageComments",
+  "arguments": {
+    "action": "reply",
+    "commentType": "regular",
+    "pageId": "123456789",
+    "parentCommentId": "98765432",
+    "content": "这是一条回复",
+    "watch": false
+  }
+}
 ```
 
-### 行内评论API
-
-14. 创建行内评论
-```typescript
-// 基本用法：对页面中的特定文本创建行内评论
-const inlineComment = await confluenceService.createInlineComment(
-  'PAGE_ID',
-  '这里需要注意性能优化',
-  'QueryHoldingsService.setHoldingData()' // 选中的文本
-);
-
-// 完整用法：指定匹配位置
-const inlineComment = await confluenceService.createInlineComment(
-  'PAGE_ID',
-  '这里需要注意性能优化',
-  'QueryHoldingsService.setHoldingData()', // 选中的文本
-  2,                                        // 匹配索引（当页面有多个相同文本时）
-  3,                                        // 匹配总数
-  '[[\"QueryHoldingsService.setHoldingData()\",\"123:1:0:0\",0,37]]', // 序列化高亮信息
-  '0'                                       // 父评论ID（0表示顶级评论）
-);
+**回复行内评论：**
+```json
+{
+  "name": "manageComments",
+  "arguments": {
+    "action": "reply",
+    "commentType": "inline",
+    "commentId": "98765432",
+    "pageId": "123456789",
+    "content": "这是对行内评论的回复"
+  }
+}
 ```
 
-15. 更新行内评论
-```typescript
-const updatedInlineComment = await confluenceService.updateInlineComment({
-  commentId: 'INLINE_COMMENT_ID',
-  content: '更新后的行内评论内容'
-  // version 参数可选，系统会自动从现有评论中获取
-});
+**`getPageComments`** - 获取页面所有评论
+```json
+{
+  "name": "getPageComments",
+  "arguments": {
+    "pageId": "123456789",
+    "start": 0,
+    "limit": 25
+  }
+}
 ```
 
-16. 删除行内评论
-```typescript
-await confluenceService.deleteInlineComment('INLINE_COMMENT_ID');
+**`getComment`** - 获取单个评论详情
+```json
+{
+  "name": "getComment",
+  "arguments": {
+    "commentId": "98765432"
+  }
+}
 ```
+
+#### 4. 搜索工具 - 专用搜索功能
+
+**`searchContent`** - 搜索页面内容（支持CQL）
+```json
+{
+  "name": "searchContent",
+  "arguments": {
+    "query": "API 开发"
+  }
+}
+```
+
+**`searchComments`** - 搜索评论内容
+```json
+{
+  "name": "searchComments",
+  "arguments": {
+    "query": "性能优化",
+    "spaceKey": "DEV",
+    "start": 0,
+    "limit": 25
+  }
+}
+```
+
+### 📝 参数说明
+
+#### action 参数选项：
+- **页面管理**: `create`, `update`, `delete`, `get`, `getContent`
+- **评论管理**: `create`, `update`, `delete`, `reply`
+
+#### commentType 参数选项：
+- **`regular`** (默认): 普通评论
+- **`inline`**: 行内评论
+
+#### representation 参数选项：
+- **`storage`** (推荐): HTML存储格式
+- **`wiki`**: Wiki标记语法
+- **`editor2`**: 编辑器格式  
+- **`view`**: 查看格式
+
+### 🎯 优化亮点
+
+✅ **工具数量优化**: 从12个工具合并为8个（减少33%）  
+✅ **统一API设计**: 通过action参数区分操作类型  
+✅ **智能参数验证**: 根据操作类型自动验证必需参数  
+✅ **完整参数注释**: MCP Inspector中可查看详细参数说明  
+✅ **新增删除功能**: 支持删除页面操作  
+✅ **双评论类型**: 统一管理普通评论和行内评论
 
 ## 安全建议
 
@@ -455,19 +593,33 @@ interface ErrorResponse {
 }
 ```
 
-## 工具列表
+## 工具概览
 
-### 页面管理（已合并）
-- `managePages` - 统一页面管理（创建、更新、删除、获取）
-- `getPageByPrettyUrl` - 通过Pretty URL获取页面（特殊用途）
-- `searchContent` - 搜索内容
+### 🎯 架构优化后的工具分组
+
+经过架构优化，工具按使用频率和逻辑分组重新组织：
+
+#### 📁 1. 基础信息工具（最常用）
 - `getSpace` - 获取空间信息
+- `getPageByPrettyUrl` - 根据标题精确获取页面
 
-### 评论管理（已合并）
-- `manageComments` - 统一评论管理（创建、更新、删除、回复）
-- `getPageComments` - 获取页面评论
-- `getComment` - 获取单个评论  
-- `searchComments` - 搜索评论
+#### 📁 2. 页面管理工具（核心功能）
+- `managePages` ⭐️ - 统一页面管理（create/update/delete/get/getContent）
+
+#### 📁 3. 评论管理工具（扩展功能）
+- `manageComments` ⭐️ - 统一评论管理（create/update/delete/reply，支持普通+行内评论）
+- `getPageComments` - 获取页面所有评论
+- `getComment` - 获取单个评论详情
+
+#### 📁 4. 搜索工具（专用搜索）
+- `searchContent` - 搜索页面内容（支持CQL语法）
+- `searchComments` - 搜索评论内容
+
+### 📊 优化成果
+- **工具数量**: 从12个优化为8个（减少33%）
+- **API统一**: 合并同类功能，通过action参数区分操作
+- **功能增强**: 新增页面删除、完善参数注释
+- **体验提升**: 按使用频率排序，提高查找效率
 
 ## 文档
 
