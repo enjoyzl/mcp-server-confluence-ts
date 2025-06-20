@@ -352,12 +352,12 @@ async function main() {
       {
         id: z.string(),
         content: z.string(),
-        version: z.number(),
+        version: z.number().optional(),
         representation: z.enum(['storage', 'wiki', 'editor2', 'view']).optional()
       },
       async ({ id, content, version, representation }) => {
         try {
-          logger.debug(`调用 updateComment 工具，参数:`, { id, version });
+          logger.debug(`调用 updateComment 工具，参数:`, { id, version: version || 'auto' });
           const comment = await confluenceService.updateComment({
             id,
             content,
@@ -433,6 +433,107 @@ async function main() {
             content: [{
               type: "text",
               text: `搜索评论失败: ${err.message}`
+            }],
+            isError: true
+          };
+        }
+      }
+    );
+
+    // 行内评论相关工具
+    server.tool(
+      "createInlineComment",
+      {
+        pageId: z.string(),
+        content: z.string(),
+        originalSelection: z.string(),
+        matchIndex: z.number().optional(),
+        numMatches: z.number().optional(),
+        serializedHighlights: z.string().optional(),
+        parentCommentId: z.string().optional()
+      },
+      async ({ pageId, content, originalSelection, matchIndex, numMatches, serializedHighlights, parentCommentId }) => {
+        try {
+          logger.debug(`调用 createInlineComment 工具，参数:`, { pageId, originalSelection, matchIndex });
+          const comment = await confluenceService.createInlineComment(
+            pageId,
+            content,
+            originalSelection,
+            matchIndex,
+            numMatches,
+            serializedHighlights,
+            parentCommentId
+          );
+          return {
+            content: [{ 
+              type: "text",
+              text: JSON.stringify(comment, null, 2)
+            }]
+          };
+        } catch (error) {
+          const err = error as ErrorResponse;
+          return {
+            content: [{
+              type: "text",
+              text: `创建行内评论失败: ${err.message}`
+            }],
+            isError: true
+          };
+        }
+      }
+    );
+
+    server.tool(
+      "updateInlineComment",
+      {
+        commentId: z.string(),
+        content: z.string()
+      },
+      async ({ commentId, content }) => {
+        try {
+          logger.debug(`调用 updateInlineComment 工具，参数:`, { commentId });
+          const comment = await confluenceService.updateInlineComment({
+            commentId,
+            content
+          });
+          return {
+            content: [{ 
+              type: "text",
+              text: JSON.stringify(comment, null, 2)
+            }]
+          };
+        } catch (error) {
+          const err = error as ErrorResponse;
+          return {
+            content: [{
+              type: "text",
+              text: `更新行内评论失败: ${err.message}`
+            }],
+            isError: true
+          };
+        }
+      }
+    );
+
+    server.tool(
+      "deleteInlineComment",
+      { commentId: z.string() },
+      async ({ commentId }) => {
+        try {
+          logger.debug(`调用 deleteInlineComment 工具，参数: ${commentId}`);
+          await confluenceService.deleteInlineComment(commentId);
+          return {
+            content: [{ 
+              type: "text",
+              text: `行内评论 ${commentId} 已成功删除`
+            }]
+          };
+        } catch (error) {
+          const err = error as ErrorResponse;
+          return {
+            content: [{
+              type: "text",
+              text: `删除行内评论失败: ${err.message}`
             }],
             isError: true
           };

@@ -9,7 +9,10 @@ import {
   ConfluenceComment,
   CommentSearchResult,
   CreateCommentRequest,
-  UpdateCommentRequest
+  UpdateCommentRequest,
+  InlineComment,
+  CreateInlineCommentRequest,
+  UpdateInlineCommentRequest
 } from '../types/confluence.types.js';
 import { ConfluenceClient, ConfluenceClientConfig } from './confluence-client.js';
 
@@ -653,17 +656,34 @@ export class ConfluenceService {
   public async updateComment(request: UpdateCommentRequest): Promise<ConfluenceComment> {
     const { id, content, version, representation = 'storage' } = request;
 
-    if (!id || !content || !version) {
-      throw new Error('Comment ID, content and version are required');
+    if (!id || !content) {
+      throw new Error('Comment ID and content are required');
     }
 
     return this.retryOperation(async () => {
       this.logger.debug('Updating comment:', { id });
 
+      let currentVersion = version;
+      
+      // 如果没有提供版本号或版本号为0，自动获取当前版本并递增
+      if (currentVersion === undefined || currentVersion === null || currentVersion === 0) {
+        try {
+          this.logger.debug('自动获取评论版本:', { id });
+          const currentComment = await this.getComment(id);
+          currentVersion = currentComment.version.number + 1;
+          this.logger.debug('自动递增版本号:', { from: currentComment.version.number, to: currentVersion });
+        } catch (error: any) {
+          this.logger.error('获取评论版本失败:', error.message);
+          throw new Error(`无法获取评论版本: ${error.message}`);
+        }
+      } else {
+        this.logger.debug('使用用户提供的版本号:', { version: currentVersion });
+      }
+
       const data = {
         type: 'comment',
         version: {
-          number: version
+          number: currentVersion
         },
         body: {
           [representation]: {
@@ -673,11 +693,14 @@ export class ConfluenceService {
         }
       };
 
+      this.logger.debug('更新评论数据:', { id, version: currentVersion, content: content.substring(0, 50) + '...' });
+
       const response = await this.client.put(`/rest/api/content/${id}`, data);
       
       // 清除缓存
       this.cache.delete(`comment:${id}`);
       
+      this.logger.debug('评论更新成功:', { id, newVersion: response.data.version?.number });
       return response.data;
     });
   }
@@ -728,6 +751,90 @@ export class ConfluenceService {
         }
       });
       return response.data;
+    });
+  }
+
+  // ========== 行内评论功能 ==========
+
+  /**
+   * 创建行内评论
+   */
+  public async createInlineComment(
+    pageId: string,
+    content: string,
+    originalSelection: string,
+    matchIndex?: number,
+    numMatches?: number,
+    serializedHighlights?: string,
+    parentCommentId?: string
+  ): Promise<InlineComment> {
+    if (!pageId || !content || !originalSelection) {
+      throw new Error('Page ID, content and original selection are required');
+    }
+
+    return this.retryOperation(async () => {
+      this.logger.debug('Creating inline comment:', { pageId, originalSelection, matchIndex });
+
+      // 构造请求数据，按照API格式
+      const data = {
+        originalSelection,
+        body: `<p>${content}</p>`,
+        matchIndex: matchIndex || 0,
+        numMatches: numMatches || 1,
+        serializedHighlights: serializedHighlights || `[["${originalSelection}","123:1:0:0",0,${originalSelection.length}]]`,
+        containerId: pageId,
+        parentCommentId: parentCommentId || "0",
+        lastFetchTime: Date.now().toString(),
+        hasDeletePermission: true,
+        hasEditPermission: true,
+        hasResolvePermission: true,
+        resolveProperties: {
+          resolved: false,
+          resolvedTime: 0
+        },
+        deleted: false
+      };
+
+      // 使用行内评论专用API端点
+      const response = await this.client.post('/rest/inlinecomments/1.0/comments', data, {
+        timeout: 15000,
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
+          'Accept-Charset': 'utf-8'
+        }
+      });
+
+      this.logger.debug('Inline comment created successfully:', response.data);
+      return response.data;
+    }, {
+      maxRetries: 2,
+      retryDelay: 1000
+    });
+  }
+
+  /**
+   * 更新行内评论
+   * 注意：由于Confluence行内评论API限制，此功能暂时不可用
+   * 建议删除原评论后重新创建新评论
+   */
+  public async updateInlineComment(request: UpdateInlineCommentRequest): Promise<InlineComment> {
+    const { commentId, content } = request;
+
+    throw new Error('行内评论更新功能暂时不可用。由于Confluence API限制，无法真正更新行内评论，只能创建新评论，这会导致重复评论问题。建议：1）删除原评论，2）创建新的行内评论。');
+  }
+
+  /**
+   * 删除行内评论
+   */
+  public async deleteInlineComment(commentId: string): Promise<void> {
+    if (!commentId) {
+      throw new Error('Comment ID is required');
+    }
+
+    return this.retryOperation(async () => {
+      this.logger.debug('Deleting inline comment:', commentId);
+      await this.client.delete(`/rest/inlinecomments/1.0/comments/${commentId}`);
     });
   }
 } 

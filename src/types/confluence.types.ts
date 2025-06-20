@@ -209,6 +209,50 @@ export interface CreateCommentRequest {
 export interface UpdateCommentRequest {
   id: string;
   content: string;
-  version: number;
+  version?: number; // 可选，自动获取并递增
   representation?: 'storage' | 'wiki' | 'editor2' | 'view';
+}
+
+// 行内评论信息
+export interface InlineComment {
+  id: string;
+  originalSelection: string;
+  body: string;
+  matchIndex: number;
+  numMatches: number;
+  serializedHighlights: string;
+  authorDisplayName: string;
+  authorUserName: string;
+  authorAvatarUrl: string;
+  containerId: string;
+  parentCommentId: string;
+  lastFetchTime: string;
+  hasDeletePermission: boolean;
+  hasEditPermission: boolean;
+  hasResolvePermission: boolean;
+  resolveProperties: {
+    resolved: boolean;
+    resolvedTime: number;
+  };
+  deleted: boolean;
+  created?: string;
+  updated?: string;
+}
+
+// 创建行内评论请求参数
+export interface CreateInlineCommentRequest {
+  pageId: string;
+  content: string;
+  originalSelection: string;
+  matchIndex?: number;
+  numMatches?: number;
+  serializedHighlights?: string;
+  parentCommentId?: string;
+}
+
+// 更新行内评论请求参数
+export interface UpdateInlineCommentRequest {
+  commentId: string;
+  content: string;
+  version?: number; // 可选，因为会从现有评论中获取
 } 

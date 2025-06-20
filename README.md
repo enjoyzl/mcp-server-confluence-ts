@@ -30,6 +30,11 @@
     - 更新评论
     - 删除评论
     - 搜索评论
+  - **行内评论功能**
+    - 对页面特定文本创建行内评论
+    - 更新和删除行内评论
+    - 智能文本定位和高亮
+    - 支持回复行内评论
 - 内置性能优化
   - HTTP 连接复用
   - 响应压缩
@@ -350,6 +355,43 @@ const searchResults = await confluenceService.searchComments('关键词', {
   start: 0,
   limit: 25
 });
+```
+
+### 行内评论API
+
+14. 创建行内评论
+```typescript
+// 基本用法：对页面中的特定文本创建行内评论
+const inlineComment = await confluenceService.createInlineComment(
+  'PAGE_ID',
+  '这里需要注意性能优化',
+  'QueryHoldingsService.setHoldingData()' // 选中的文本
+);
+
+// 完整用法：指定匹配位置
+const inlineComment = await confluenceService.createInlineComment(
+  'PAGE_ID',
+  '这里需要注意性能优化',
+  'QueryHoldingsService.setHoldingData()', // 选中的文本
+  2,                                        // 匹配索引（当页面有多个相同文本时）
+  3,                                        // 匹配总数
+  '[[\"QueryHoldingsService.setHoldingData()\",\"123:1:0:0\",0,37]]', // 序列化高亮信息
+  '0'                                       // 父评论ID（0表示顶级评论）
+);
+```
+
+15. 更新行内评论
+```typescript
+const updatedInlineComment = await confluenceService.updateInlineComment({
+  commentId: 'INLINE_COMMENT_ID',
+  content: '更新后的行内评论内容'
+  // version 参数可选，系统会自动从现有评论中获取
+});
+```
+
+16. 删除行内评论
+```typescript
+await confluenceService.deleteInlineComment('INLINE_COMMENT_ID');
 ```
 
 ## 安全建议
