@@ -470,39 +470,55 @@ export class ConfluenceService {
     // 生成UUID（模仿浏览器行为）
     const uuid = this.generateUUID();
     
-    // 根据实际浏览器请求构造表单数据
-    const formData = new URLSearchParams();
-    formData.append('html', `<p>${content}</p>`);
-    formData.append('watch', 'false');
-    formData.append('uuid', uuid);
+    // 根据实际浏览器请求构造表单数据，确保UTF-8编码
+    // 确保内容正确编码为UTF-8
+    const htmlContent = `<p>${content}</p>`;
+    
+    // 使用手动构造表单数据来确保UTF-8编码
+    const formParams: Record<string, string> = {
+      html: htmlContent,
+      watch: 'false',
+      uuid: uuid,
+      asyncRenderSafe: 'true',
+      isInlineComment: 'false'
+    };
     
     // 添加XSRF token（如果获取到）
     if (xsrfToken) {
-      formData.append('atl_token', xsrfToken);
+      formParams.atl_token = xsrfToken;
     }
-    
-    // 可能需要的额外字段
-    formData.append('asyncRenderSafe', 'true');
-    formData.append('isInlineComment', 'false');
     
     // 如果是回复评论，添加父评论ID（尝试不同的字段名）
     if (parentCommentId) {
-      formData.append('parentId', parentCommentId);
-      formData.append('replyToComment', parentCommentId);
+      formParams.parentId = parentCommentId;
+      formParams.replyToComment = parentCommentId;
     }
+    
+    // 手动构造表单数据以确保正确的UTF-8编码
+    const formDataString = Object.entries(formParams)
+      .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+      .join('&');
 
     const endpoint = `/rest/tinymce/1/content/${pageId}/comment`;
     const params = { actions: true };
 
-    this.logger.debug('TinyMCE form data:', formData.toString());
+    // 记录表单数据，但避免记录敏感的token信息
+    this.logger.debug('TinyMCE form data:', {
+      html: htmlContent,
+      watch: 'false',
+      uuid: uuid,
+      hasToken: !!xsrfToken,
+      parentCommentId
+    });
     
     try {
-      const response = await this.client.post(endpoint, formData.toString(), { 
+      const response = await this.client.post(endpoint, formDataString, { 
         params,
         timeout: 15000,
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Accept': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
+          'Accept-Charset': 'utf-8',
           'X-Atlassian-Token': 'no-check', // 绕过XSRF检查
           ...(xsrfToken && { 'X-XSRF-Token': xsrfToken }) // 同时提供token
         }
@@ -516,7 +532,7 @@ export class ConfluenceService {
         status: error.response?.status,
         message: error.message,
         data: error.response?.data,
-        formData: formData.toString()
+        formData: formDataString
       });
       throw error;
     }

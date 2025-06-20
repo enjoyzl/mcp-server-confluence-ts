@@ -61,8 +61,9 @@ export class ConfluenceClient {
       httpsAgent,
       headers: {
         'Authorization': authHeader,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
+        'Content-Type': 'application/json; charset=utf-8',
+        'Accept': 'application/json; charset=utf-8',
+        'Accept-Charset': 'utf-8',
         'Connection': config.keepAlive ? 'keep-alive' : 'close'
       },
       decompress: true,
