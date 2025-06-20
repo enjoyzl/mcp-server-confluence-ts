@@ -24,6 +24,12 @@
   - 获取页面详细信息
   - 通过 Pretty URL 获取页面信息
   - 创建和更新页面
+  - **评论管理功能**
+    - 获取页面评论
+    - 创建评论和回复
+    - 更新评论
+    - 删除评论
+    - 搜索评论
 - 内置性能优化
   - HTTP 连接复用
   - 响应压缩
@@ -280,6 +286,70 @@ const results = await confluenceService.searchContent('search query');
 7. 获取页面详细内容
 ```typescript
 const content = await confluenceService.getPageContent('PAGE_ID');
+```
+
+### 评论管理API
+
+8. 获取页面评论
+```typescript
+// 获取页面所有评论
+const comments = await confluenceService.getPageComments('PAGE_ID');
+
+// 分页获取评论
+const comments = await confluenceService.getPageComments('PAGE_ID', { 
+  start: 0, 
+  limit: 10 
+});
+```
+
+9. 获取评论详情
+```typescript
+const comment = await confluenceService.getComment('COMMENT_ID');
+```
+
+10. 创建评论
+```typescript
+// 创建普通评论
+const comment = await confluenceService.createComment({
+  pageId: 'PAGE_ID',
+  content: '这是一条评论',
+  representation: 'storage' // 可选，默认为 'storage'
+});
+
+// 回复评论
+const reply = await confluenceService.createComment({
+  pageId: 'PAGE_ID',
+  content: '这是一条回复',
+  parentCommentId: 'PARENT_COMMENT_ID' // 父评论ID
+});
+```
+
+11. 更新评论
+```typescript
+const updatedComment = await confluenceService.updateComment({
+  id: 'COMMENT_ID',
+  content: '更新后的评论内容',
+  version: 2, // 评论版本号
+  representation: 'storage' // 可选，默认为 'storage'
+});
+```
+
+12. 删除评论
+```typescript
+await confluenceService.deleteComment('COMMENT_ID');
+```
+
+13. 搜索评论
+```typescript
+// 搜索所有评论
+const searchResults = await confluenceService.searchComments('关键词');
+
+// 在特定空间中搜索评论
+const searchResults = await confluenceService.searchComments('关键词', {
+  spaceKey: 'SPACE_KEY',
+  start: 0,
+  limit: 25
+});
 ```
 
 ## 安全建议

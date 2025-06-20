@@ -254,6 +254,192 @@ async function main() {
       }
     );
 
+    // 评论相关工具
+    server.tool(
+      "getPageComments",
+      {
+        pageId: z.string(),
+        start: z.number().optional(),
+        limit: z.number().optional()
+      },
+      async ({ pageId, start, limit }) => {
+        try {
+          logger.debug(`调用 getPageComments 工具，参数:`, { pageId, start, limit });
+          const comments = await confluenceService.getPageComments(pageId, { start, limit });
+          return {
+            content: [{ 
+              type: "text",
+              text: JSON.stringify(comments, null, 2)
+            }]
+          };
+        } catch (error) {
+          const err = error as ErrorResponse;
+          return {
+            content: [{
+              type: "text",
+              text: `获取页面评论失败: ${err.message}`
+            }],
+            isError: true
+          };
+        }
+      }
+    );
+
+    server.tool(
+      "getComment",
+      { commentId: z.string() },
+      async ({ commentId }) => {
+        try {
+          logger.debug(`调用 getComment 工具，参数: ${commentId}`);
+          const comment = await confluenceService.getComment(commentId);
+          return {
+            content: [{ 
+              type: "text",
+              text: JSON.stringify(comment, null, 2)
+            }]
+          };
+        } catch (error) {
+          const err = error as ErrorResponse;
+          return {
+            content: [{
+              type: "text",
+              text: `获取评论失败: ${err.message}`
+            }],
+            isError: true
+          };
+        }
+      }
+    );
+
+    server.tool(
+      "createComment",
+      {
+        pageId: z.string(),
+        content: z.string(),
+        representation: z.enum(['storage', 'wiki', 'editor2', 'view']).optional(),
+        parentCommentId: z.string().optional()
+      },
+      async ({ pageId, content, representation, parentCommentId }) => {
+        try {
+          logger.debug(`调用 createComment 工具，参数:`, { pageId, parentCommentId });
+          const comment = await confluenceService.createComment({
+            pageId,
+            content,
+            representation,
+            parentCommentId
+          });
+          return {
+            content: [{ 
+              type: "text",
+              text: JSON.stringify(comment, null, 2)
+            }]
+          };
+        } catch (error) {
+          const err = error as ErrorResponse;
+          return {
+            content: [{
+              type: "text",
+              text: `创建评论失败: ${err.message}`
+            }],
+            isError: true
+          };
+        }
+      }
+    );
+
+    server.tool(
+      "updateComment",
+      {
+        id: z.string(),
+        content: z.string(),
+        version: z.number(),
+        representation: z.enum(['storage', 'wiki', 'editor2', 'view']).optional()
+      },
+      async ({ id, content, version, representation }) => {
+        try {
+          logger.debug(`调用 updateComment 工具，参数:`, { id, version });
+          const comment = await confluenceService.updateComment({
+            id,
+            content,
+            version,
+            representation
+          });
+          return {
+            content: [{ 
+              type: "text",
+              text: JSON.stringify(comment, null, 2)
+            }]
+          };
+        } catch (error) {
+          const err = error as ErrorResponse;
+          return {
+            content: [{
+              type: "text",
+              text: `更新评论失败: ${err.message}`
+            }],
+            isError: true
+          };
+        }
+      }
+    );
+
+    server.tool(
+      "deleteComment",
+      { commentId: z.string() },
+      async ({ commentId }) => {
+        try {
+          logger.debug(`调用 deleteComment 工具，参数: ${commentId}`);
+          await confluenceService.deleteComment(commentId);
+          return {
+            content: [{ 
+              type: "text",
+              text: `评论 ${commentId} 已成功删除`
+            }]
+          };
+        } catch (error) {
+          const err = error as ErrorResponse;
+          return {
+            content: [{
+              type: "text",
+              text: `删除评论失败: ${err.message}`
+            }],
+            isError: true
+          };
+        }
+      }
+    );
+
+    server.tool(
+      "searchComments",
+      {
+        query: z.string(),
+        start: z.number().optional(),
+        limit: z.number().optional(),
+        spaceKey: z.string().optional()
+      },
+      async ({ query, start, limit, spaceKey }) => {
+        try {
+          logger.debug(`调用 searchComments 工具，参数:`, { query, start, limit, spaceKey });
+          const results = await confluenceService.searchComments(query, { start, limit, spaceKey });
+          return {
+            content: [{ 
+              type: "text",
+              text: JSON.stringify(results, null, 2)
+            }]
+          };
+        } catch (error) {
+          const err = error as ErrorResponse;
+          return {
+            content: [{
+              type: "text",
+              text: `搜索评论失败: ${err.message}`
+            }],
+            isError: true
+          };
+        }
+      }
+    );
+
     // 创建传输层
     const transport = new StdioServerTransport();
 

@@ -5,7 +5,11 @@ import {
   SearchResult,
   ErrorResponse,
   CreatePageRequest,
-  UpdatePageRequest
+  UpdatePageRequest,
+  ConfluenceComment,
+  CommentSearchResult,
+  CreateCommentRequest,
+  UpdateCommentRequest
 } from '../types/confluence.types.js';
 import { ConfluenceClient, ConfluenceClientConfig } from './confluence-client.js';
 
@@ -338,6 +342,168 @@ export class ConfluenceService {
       this.cache.delete(`page:${id}`);
       this.cache.delete(`page-content:${id}`);
       
+      return response.data;
+    });
+  }
+
+  /**
+   * 获取页面评论
+   */
+  public async getPageComments(
+    pageId: string,
+    options: { start?: number; limit?: number } = {}
+  ): Promise<CommentSearchResult> {
+    if (!pageId) {
+      throw new Error('Page ID is required');
+    }
+
+    const { start = 0, limit = 25 } = options;
+
+    return this.retryOperation(async () => {
+      this.logger.debug('Getting page comments:', { pageId, start, limit });
+      const response = await this.client.get(`/rest/api/content/${pageId}/child/comment`, {
+        params: {
+          start,
+          limit,
+          expand: 'body.storage,version,history,container'
+        }
+      });
+      return response.data;
+    });
+  }
+
+  /**
+   * 获取评论详细信息
+   */
+  public async getComment(commentId: string): Promise<ConfluenceComment> {
+    if (!commentId) {
+      throw new Error('Comment ID is required');
+    }
+
+    return this.getCachedData(
+      `comment:${commentId}`,
+      () => this.retryOperation(async () => {
+        this.logger.debug('Getting comment:', commentId);
+        const response = await this.client.get(`/rest/api/content/${commentId}`, {
+          params: {
+            expand: 'body.storage,version,history,container'
+          }
+        });
+        return response.data;
+      })
+    );
+  }
+
+  /**
+   * 创建评论
+   */
+  public async createComment(request: CreateCommentRequest): Promise<ConfluenceComment> {
+    const { pageId, content, representation = 'storage', parentCommentId } = request;
+
+    if (!pageId || !content) {
+      throw new Error('Page ID and content are required');
+    }
+
+    return this.retryOperation(async () => {
+      this.logger.debug('Creating comment:', { pageId, parentCommentId });
+
+      const data = {
+        type: 'comment',
+        container: { id: pageId },
+        body: {
+          [representation]: {
+            value: content,
+            representation
+          }
+        },
+        ...(parentCommentId && { ancestors: [{ id: parentCommentId }] })
+      };
+
+      const response = await this.client.post('/rest/api/content', data);
+      return response.data;
+    });
+  }
+
+  /**
+   * 更新评论
+   */
+  public async updateComment(request: UpdateCommentRequest): Promise<ConfluenceComment> {
+    const { id, content, version, representation = 'storage' } = request;
+
+    if (!id || !content || !version) {
+      throw new Error('Comment ID, content and version are required');
+    }
+
+    return this.retryOperation(async () => {
+      this.logger.debug('Updating comment:', { id });
+
+      const data = {
+        type: 'comment',
+        version: {
+          number: version
+        },
+        body: {
+          [representation]: {
+            value: content,
+            representation
+          }
+        }
+      };
+
+      const response = await this.client.put(`/rest/api/content/${id}`, data);
+      
+      // 清除缓存
+      this.cache.delete(`comment:${id}`);
+      
+      return response.data;
+    });
+  }
+
+  /**
+   * 删除评论
+   */
+  public async deleteComment(commentId: string): Promise<void> {
+    if (!commentId) {
+      throw new Error('Comment ID is required');
+    }
+
+    return this.retryOperation(async () => {
+      this.logger.debug('Deleting comment:', commentId);
+      await this.client.delete(`/rest/api/content/${commentId}`);
+      
+      // 清除缓存
+      this.cache.delete(`comment:${commentId}`);
+    });
+  }
+
+  /**
+   * 搜索评论
+   */
+  public async searchComments(
+    query: string,
+    options: { start?: number; limit?: number; spaceKey?: string } = {}
+  ): Promise<CommentSearchResult> {
+    if (!query) {
+      throw new Error('Search query is required');
+    }
+
+    const { start = 0, limit = 25, spaceKey } = options;
+    let cql = `type = comment AND ${query}`;
+
+    if (spaceKey) {
+      cql = `${cql} AND space = "${spaceKey}"`;
+    }
+
+    return this.retryOperation(async () => {
+      this.logger.debug('Searching comments:', { cql, start, limit });
+      const response = await this.client.get('/rest/api/content/search', {
+        params: {
+          cql,
+          start,
+          limit,
+          expand: 'body.storage,version,history,container'
+        }
+      });
       return response.data;
     });
   }

@@ -129,4 +129,86 @@ export interface UpdatePageRequest {
   content?: string;
   version?: number;
   representation?: 'storage' | 'wiki' | 'editor2' | 'view';
+}
+
+// Confluence 评论信息
+export interface ConfluenceComment {
+  id: string;
+  type: string;
+  status: string;
+  title: string;
+  body: {
+    storage: {
+      value: string;
+      representation: string;
+    };
+  };
+  version: {
+    number: number;
+    by: {
+      username: string;
+      displayName: string;
+      profilePicture?: {
+        path: string;
+        width: number;
+        height: number;
+        isDefault: boolean;
+      };
+    };
+    when: string;
+    message?: string;
+  };
+  history: {
+    latest: boolean;
+    createdBy: {
+      username: string;
+      displayName: string;
+      profilePicture?: {
+        path: string;
+        width: number;
+        height: number;
+        isDefault: boolean;
+      };
+    };
+    createdDate: string;
+  };
+  container: {
+    id: string;
+    type: string;
+    title: string;
+  };
+  _links: {
+    webui: string;
+    self: string;
+  };
+}
+
+// 评论搜索结果
+export interface CommentSearchResult {
+  results: ConfluenceComment[];
+  start: number;
+  limit: number;
+  size: number;
+  totalSize?: number;
+  _links: {
+    base: string;
+    context: string;
+    self: string;
+  };
+}
+
+// 创建评论请求参数
+export interface CreateCommentRequest {
+  pageId: string;
+  content: string;
+  representation?: 'storage' | 'wiki' | 'editor2' | 'view';
+  parentCommentId?: string; // 用于回复评论
+}
+
+// 更新评论请求参数
+export interface UpdateCommentRequest {
+  id: string;
+  content: string;
+  version: number;
+  representation?: 'storage' | 'wiki' | 'editor2' | 'view';
 } 
