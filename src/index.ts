@@ -322,12 +322,12 @@ async function main() {
       async ({ pageId, content, representation, parentCommentId }) => {
         try {
           logger.debug(`调用 createComment 工具，参数:`, { pageId, parentCommentId });
-          const comment = await confluenceService.createComment({
+          const comment = await confluenceService.createComment(
             pageId,
             content,
             representation,
             parentCommentId
-          });
+          );
           return {
             content: [{ 
               type: "text",

@@ -66,15 +66,27 @@ export class ConfluenceService {
    */
   private async retryOperation<T>(
     operation: () => Promise<T>,
-    retries: number = this.maxRetries
+    options?: { maxRetries?: number; retryDelay?: number } | number
   ): Promise<T> {
+    // 向后兼容：如果options是数字，则视为maxRetries
+    let maxRetries: number;
+    let retryDelay: number;
+    
+    if (typeof options === 'number') {
+      maxRetries = options;
+      retryDelay = 1000;
+    } else {
+      maxRetries = options?.maxRetries ?? this.maxRetries;
+      retryDelay = options?.retryDelay ?? 1000;
+    }
+    
     try {
       return await operation();
     } catch (error: any) {
-      if (retries > 0 && this.isRetryableError(error)) {
-        this.logger.warn(`Retrying operation, ${retries} attempts remaining`);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        return this.retryOperation(operation, retries - 1);
+      if (maxRetries > 0 && this.isRetryableError(error)) {
+        this.logger.warn(`Retrying operation, ${maxRetries} attempts remaining`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        return this.retryOperation(operation, { maxRetries: maxRetries - 1, retryDelay });
       }
       throw error;
     }
@@ -395,32 +407,227 @@ export class ConfluenceService {
   }
 
   /**
-   * 创建评论
+   * 获取XSRF Token
    */
-  public async createComment(request: CreateCommentRequest): Promise<ConfluenceComment> {
-    const { pageId, content, representation = 'storage', parentCommentId } = request;
+  private async getXsrfToken(pageId?: string): Promise<string | null> {
+    try {
+      // 方法1: 尝试从登录页面获取token（不需要特定页面权限）
+      let pageResponse;
+      try {
+        pageResponse = await this.client.get(`/login.action`, {
+          timeout: 10000
+        });
+      } catch (loginError) {
+        // 如果登录页面不可访问，尝试使用提供的页面ID
+        if (pageId) {
+          pageResponse = await this.client.get(`/pages/viewpage.action`, {
+            params: { pageId },
+            timeout: 10000
+          });
+        } else {
+          throw loginError;
+        }
+      }
+      
+      const pageContent = pageResponse.data;
+      
+      // 从页面内容中提取XSRF token
+      const tokenMatch = pageContent.match(/name="atl_token"\s+value="([^"]+)"/);
+      if (tokenMatch) {
+        this.logger.debug('XSRF token found via page content');
+        return tokenMatch[1];
+      }
 
-    if (!pageId || !content) {
-      throw new Error('Page ID and content are required');
+      // 方法2: 尝试从meta标签获取
+      const metaMatch = pageContent.match(/<meta\s+name="ajs-atl-token"\s+content="([^"]+)"/);
+      if (metaMatch) {
+        this.logger.debug('XSRF token found via meta tag');
+        return metaMatch[1];
+      }
+
+      this.logger.warn('Could not find XSRF token in page content');
+      return null;
+    } catch (error: any) {
+      this.logger.error('Failed to get XSRF token:', error.message);
+      return null;
+    }
+  }
+
+  /**
+   * 使用TinyMCE端点创建评论（Confluence 7.4优化版本）
+   */
+  private async createCommentWithTinyMCE(
+    pageId: string, 
+    content: string, 
+    parentCommentId?: string
+  ): Promise<any> {
+    this.logger.debug('Creating comment with TinyMCE endpoint:', { pageId, parentCommentId });
+    
+    // 获取XSRF token
+    const xsrfToken = await this.getXsrfToken(pageId);
+    this.logger.debug('XSRF token obtained:', xsrfToken ? 'Yes' : 'No');
+    
+    // 生成UUID（模仿浏览器行为）
+    const uuid = this.generateUUID();
+    
+    // 根据实际浏览器请求构造表单数据
+    const formData = new URLSearchParams();
+    formData.append('html', `<p>${content}</p>`);
+    formData.append('watch', 'false');
+    formData.append('uuid', uuid);
+    
+    // 添加XSRF token（如果获取到）
+    if (xsrfToken) {
+      formData.append('atl_token', xsrfToken);
+    }
+    
+    // 可能需要的额外字段
+    formData.append('asyncRenderSafe', 'true');
+    formData.append('isInlineComment', 'false');
+    
+    // 如果是回复评论，添加父评论ID（尝试不同的字段名）
+    if (parentCommentId) {
+      formData.append('parentId', parentCommentId);
+      formData.append('replyToComment', parentCommentId);
     }
 
+    const endpoint = `/rest/tinymce/1/content/${pageId}/comment`;
+    const params = { actions: true };
+
+    this.logger.debug('TinyMCE form data:', formData.toString());
+    
+    try {
+      const response = await this.client.post(endpoint, formData.toString(), { 
+        params,
+        timeout: 15000,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json',
+          'X-Atlassian-Token': 'no-check', // 绕过XSRF检查
+          ...(xsrfToken && { 'X-XSRF-Token': xsrfToken }) // 同时提供token
+        }
+      });
+      
+      this.logger.debug('TinyMCE request succeeded:', response.data);
+      return response.data;
+      
+    } catch (error: any) {
+      this.logger.error('TinyMCE request failed:', {
+        status: error.response?.status,
+        message: error.message,
+        data: error.response?.data,
+        formData: formData.toString()
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * 生成UUID（模仿浏览器生成的UUID格式）
+   * 基于实际观察到的格式：c19dc906-70a3-330f-6222-e842fb767266
+   */
+  private generateUUID(): string {
+    // 生成8-4-4-4-12格式的UUID，确保第3段第1位是4，第4段第1位是8/9/a/b
+    const hex = '0123456789abcdef';
+    let uuid = '';
+    
+    for (let i = 0; i < 36; i++) {
+      if (i === 8 || i === 13 || i === 18 || i === 23) {
+        uuid += '-';
+      } else if (i === 14) {
+        uuid += '4'; // 版本号
+      } else if (i === 19) {
+        uuid += hex[(Math.random() * 4 | 0) + 8]; // 8, 9, a, 或 b
+      } else {
+        uuid += hex[Math.random() * 16 | 0];
+      }
+    }
+    
+    return uuid;
+  }
+
+  /**
+   * 创建评论
+   */
+  public async createComment(
+    pageId: string, 
+    content: string, 
+    representation: string = 'storage',
+    parentCommentId?: string
+  ): Promise<ConfluenceComment> {
     return this.retryOperation(async () => {
       this.logger.debug('Creating comment:', { pageId, parentCommentId });
 
-      const data = {
-        type: 'comment',
-        container: { id: pageId },
-        body: {
-          [representation]: {
-            value: content,
-            representation
+      try {
+        // 优先使用TinyMCE端点（浏览器实际使用的方式）
+        this.logger.debug('Attempting TinyMCE endpoint first');
+        const tinyMceResult = await this.createCommentWithTinyMCE(pageId, content, parentCommentId);
+        
+        // TinyMCE端点返回的数据格式与标准API不同，需要转换
+        return {
+          id: tinyMceResult.id.toString(),
+          type: 'comment',
+          body: {
+            storage: {
+              value: tinyMceResult.html,
+              representation: 'storage'
+            }
+          },
+          version: {
+            number: 1
           }
-        },
-        ...(parentCommentId && { ancestors: [{ id: parentCommentId }] })
-      };
+        } as ConfluenceComment;
+        
+      } catch (tinyMceError: any) {
+        this.logger.warn('TinyMCE endpoint failed, falling back to standard API:', {
+          error: tinyMceError.message,
+          status: tinyMceError.response?.status
+        });
 
-      const response = await this.client.post('/rest/api/content', data);
-      return response.data;
+        // 备用方案：使用标准REST API
+        const data = {
+          type: 'comment',
+          container: { id: pageId },
+          body: {
+            [representation]: {
+              value: content,
+              representation
+            }
+          },
+          ...(parentCommentId && { ancestors: [{ id: parentCommentId }] })
+        };
+
+        try {
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Comment creation timeout after 30 seconds')), 30000);
+          });
+
+          const createPromise = this.client.post('/rest/api/content', data);
+          
+          const response = await Promise.race([createPromise, timeoutPromise]) as any;
+          return response.data;
+          
+        } catch (apiError: any) {
+          this.logger.error('Both comment creation methods failed:', {
+            tinyMceError: tinyMceError.message,
+            apiError: apiError.message
+          });
+
+          // 提供更友好的错误信息
+          if (apiError.response?.status === 403 || tinyMceError.response?.status === 403) {
+            throw new Error('Permission denied: You do not have permission to comment on this page');
+          } else if (apiError.response?.status === 404) {
+            throw new Error('Page not found: The specified page does not exist');
+          } else if (apiError.message.includes('timeout')) {
+            throw new Error('Comment creation timeout. The server may be busy, please try again later.');
+          }
+
+          throw new Error(`Comment creation failed: ${apiError.message || tinyMceError.message}. Please try again later or contact administrator.`);
+        }
+      }
+    }, {
+      maxRetries: 1, // TinyMCE端点通常更可靠，减少重试
+      retryDelay: 1000
     });
   }
 
