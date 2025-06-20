@@ -256,6 +256,142 @@ async function main() {
 
     // 评论相关工具
     server.tool(
+      "manageComments",
+      {
+        action: z.enum(['create', 'update', 'delete', 'reply']),
+        commentType: z.enum(['regular', 'inline']).optional(),
+        // 通用参数
+        pageId: z.string().optional(),
+        commentId: z.string().optional(),
+        content: z.string().optional(),
+        // 普通评论参数
+        representation: z.enum(['storage', 'wiki', 'editor2', 'view']).optional(),
+        parentCommentId: z.string().optional(),
+        version: z.number().optional(),
+        watch: z.boolean().optional(),
+        // 行内评论参数
+        originalSelection: z.string().optional(),
+        matchIndex: z.number().optional(),
+        numMatches: z.number().optional(),
+        serializedHighlights: z.string().optional()
+      },
+      async ({ action, commentType = 'regular', pageId, commentId, content, representation, parentCommentId, version, watch, originalSelection, matchIndex, numMatches, serializedHighlights }) => {
+        try {
+          logger.debug(`调用 manageComments 工具，参数:`, { action, commentType, pageId, commentId });
+          
+          let result: any;
+          
+          switch (action) {
+            case 'create':
+              if (commentType === 'inline') {
+                if (!pageId || !content || !originalSelection) {
+                  throw new Error('创建行内评论需要 pageId、content 和 originalSelection 参数');
+                }
+                result = await confluenceService.createInlineComment(
+                  pageId,
+                  content,
+                  originalSelection,
+                  matchIndex,
+                  numMatches,
+                  serializedHighlights,
+                  parentCommentId
+                );
+              } else {
+                if (!pageId || !content) {
+                  throw new Error('创建普通评论需要 pageId 和 content 参数');
+                }
+                result = await confluenceService.createComment(
+                  pageId,
+                  content,
+                  representation,
+                  parentCommentId
+                );
+              }
+              break;
+              
+            case 'update':
+              if (commentType === 'inline') {
+                if (!commentId || !content) {
+                  throw new Error('更新行内评论需要 commentId 和 content 参数');
+                }
+                result = await confluenceService.updateInlineComment({
+                  commentId,
+                  content
+                });
+              } else {
+                if (!commentId || !content) {
+                  throw new Error('更新普通评论需要 commentId 和 content 参数');
+                }
+                result = await confluenceService.updateComment({
+                  id: commentId,
+                  content,
+                  version,
+                  representation
+                });
+              }
+              break;
+              
+            case 'delete':
+              if (!commentId) {
+                throw new Error('删除评论需要 commentId 参数');
+              }
+              if (commentType === 'inline') {
+                await confluenceService.deleteInlineComment(commentId);
+                result = { message: `行内评论 ${commentId} 已成功删除` };
+              } else {
+                await confluenceService.deleteComment(commentId);
+                result = { message: `评论 ${commentId} 已成功删除` };
+              }
+              break;
+              
+            case 'reply':
+              if (commentType === 'inline') {
+                if (!commentId || !pageId || !content) {
+                  throw new Error('回复行内评论需要 commentId、pageId 和 content 参数');
+                }
+                result = await confluenceService.replyInlineComment({
+                  commentId,
+                  pageId,
+                  content
+                });
+              } else {
+                if (!pageId || !parentCommentId || !content) {
+                  throw new Error('回复普通评论需要 pageId、parentCommentId 和 content 参数');
+                }
+                result = await confluenceService.replyComment({
+                  pageId,
+                  parentCommentId,
+                  content,
+                  watch
+                });
+              }
+              break;
+              
+            default:
+              throw new Error(`不支持的操作: ${action}`);
+          }
+          
+          return {
+            content: [{ 
+              type: "text",
+              text: JSON.stringify(result, null, 2)
+            }]
+          };
+        } catch (error) {
+          const err = error as ErrorResponse;
+          return {
+            content: [{
+              type: "text",
+              text: `评论操作失败: ${err.message}`
+            }],
+            isError: true
+          };
+        }
+      }
+    );
+
+    // 保留独立的获取评论工具，因为它们有不同的用途
+    server.tool(
       "getPageComments",
       {
         pageId: z.string(),
@@ -312,104 +448,6 @@ async function main() {
     );
 
     server.tool(
-      "createComment",
-      {
-        pageId: z.string(),
-        content: z.string(),
-        representation: z.enum(['storage', 'wiki', 'editor2', 'view']).optional(),
-        parentCommentId: z.string().optional()
-      },
-      async ({ pageId, content, representation, parentCommentId }) => {
-        try {
-          logger.debug(`调用 createComment 工具，参数:`, { pageId, parentCommentId });
-          const comment = await confluenceService.createComment(
-            pageId,
-            content,
-            representation,
-            parentCommentId
-          );
-          return {
-            content: [{ 
-              type: "text",
-              text: JSON.stringify(comment, null, 2)
-            }]
-          };
-        } catch (error) {
-          const err = error as ErrorResponse;
-          return {
-            content: [{
-              type: "text",
-              text: `创建评论失败: ${err.message}`
-            }],
-            isError: true
-          };
-        }
-      }
-    );
-
-    server.tool(
-      "updateComment",
-      {
-        id: z.string(),
-        content: z.string(),
-        version: z.number().optional(),
-        representation: z.enum(['storage', 'wiki', 'editor2', 'view']).optional()
-      },
-      async ({ id, content, version, representation }) => {
-        try {
-          logger.debug(`调用 updateComment 工具，参数:`, { id, version: version || 'auto' });
-          const comment = await confluenceService.updateComment({
-            id,
-            content,
-            version,
-            representation
-          });
-          return {
-            content: [{ 
-              type: "text",
-              text: JSON.stringify(comment, null, 2)
-            }]
-          };
-        } catch (error) {
-          const err = error as ErrorResponse;
-          return {
-            content: [{
-              type: "text",
-              text: `更新评论失败: ${err.message}`
-            }],
-            isError: true
-          };
-        }
-      }
-    );
-
-    server.tool(
-      "deleteComment",
-      { commentId: z.string() },
-      async ({ commentId }) => {
-        try {
-          logger.debug(`调用 deleteComment 工具，参数: ${commentId}`);
-          await confluenceService.deleteComment(commentId);
-          return {
-            content: [{ 
-              type: "text",
-              text: `评论 ${commentId} 已成功删除`
-            }]
-          };
-        } catch (error) {
-          const err = error as ErrorResponse;
-          return {
-            content: [{
-              type: "text",
-              text: `删除评论失败: ${err.message}`
-            }],
-            isError: true
-          };
-        }
-      }
-    );
-
-    server.tool(
       "searchComments",
       {
         query: z.string(),
@@ -433,177 +471,6 @@ async function main() {
             content: [{
               type: "text",
               text: `搜索评论失败: ${err.message}`
-            }],
-            isError: true
-          };
-        }
-      }
-    );
-
-    // 行内评论相关工具
-    server.tool(
-      "createInlineComment",
-      {
-        pageId: z.string(),
-        content: z.string(),
-        originalSelection: z.string(),
-        matchIndex: z.number().optional(),
-        numMatches: z.number().optional(),
-        serializedHighlights: z.string().optional(),
-        parentCommentId: z.string().optional()
-      },
-      async ({ pageId, content, originalSelection, matchIndex, numMatches, serializedHighlights, parentCommentId }) => {
-        try {
-          logger.debug(`调用 createInlineComment 工具，参数:`, { pageId, originalSelection, matchIndex });
-          const comment = await confluenceService.createInlineComment(
-            pageId,
-            content,
-            originalSelection,
-            matchIndex,
-            numMatches,
-            serializedHighlights,
-            parentCommentId
-          );
-          return {
-            content: [{ 
-              type: "text",
-              text: JSON.stringify(comment, null, 2)
-            }]
-          };
-        } catch (error) {
-          const err = error as ErrorResponse;
-          return {
-            content: [{
-              type: "text",
-              text: `创建行内评论失败: ${err.message}`
-            }],
-            isError: true
-          };
-        }
-      }
-    );
-
-    server.tool(
-      "updateInlineComment",
-      {
-        commentId: z.string(),
-        content: z.string()
-      },
-      async ({ commentId, content }) => {
-        try {
-          logger.debug(`调用 updateInlineComment 工具，参数:`, { commentId });
-          const comment = await confluenceService.updateInlineComment({
-            commentId,
-            content
-          });
-          return {
-            content: [{ 
-              type: "text",
-              text: JSON.stringify(comment, null, 2)
-            }]
-          };
-        } catch (error) {
-          const err = error as ErrorResponse;
-          return {
-            content: [{
-              type: "text",
-              text: `更新行内评论失败: ${err.message}`
-            }],
-            isError: true
-          };
-        }
-      }
-    );
-
-    server.tool(
-      "deleteInlineComment",
-      { commentId: z.string() },
-      async ({ commentId }) => {
-        try {
-          logger.debug(`调用 deleteInlineComment 工具，参数: ${commentId}`);
-          await confluenceService.deleteInlineComment(commentId);
-          return {
-            content: [{ 
-              type: "text",
-              text: `行内评论 ${commentId} 已成功删除`
-            }]
-          };
-        } catch (error) {
-          const err = error as ErrorResponse;
-          return {
-            content: [{
-              type: "text",
-              text: `删除行内评论失败: ${err.message}`
-            }],
-            isError: true
-          };
-        }
-      }
-    );
-
-    server.tool(
-      "replyInlineComment",
-      {
-        commentId: z.string(),
-        pageId: z.string(),
-        content: z.string()
-      },
-      async ({ commentId, pageId, content }) => {
-        try {
-          logger.debug(`调用 replyInlineComment 工具，参数:`, { commentId, pageId });
-          const reply = await confluenceService.replyInlineComment({
-            commentId,
-            pageId,
-            content
-          });
-          return {
-            content: [{ 
-              type: "text",
-              text: JSON.stringify(reply, null, 2)
-            }]
-          };
-        } catch (error) {
-          const err = error as ErrorResponse;
-          return {
-            content: [{
-              type: "text",
-              text: `回复行内评论失败: ${err.message}`
-            }],
-            isError: true
-          };
-        }
-      }
-    );
-
-    server.tool(
-      "replyComment",
-      {
-        pageId: z.string(),
-        parentCommentId: z.string(),
-        content: z.string(),
-        watch: z.boolean().optional()
-      },
-      async ({ pageId, parentCommentId, content, watch }) => {
-        try {
-          logger.debug(`调用 replyComment 工具，参数:`, { pageId, parentCommentId, watch: watch || false });
-          const reply = await confluenceService.replyComment({
-            pageId,
-            parentCommentId,
-            content,
-            watch
-          });
-          return {
-            content: [{ 
-              type: "text",
-              text: JSON.stringify(reply, null, 2)
-            }]
-          };
-        } catch (error) {
-          const err = error as ErrorResponse;
-          return {
-            content: [{
-              type: "text",
-              text: `回复评论失败: ${err.message}`
             }],
             isError: true
           };
