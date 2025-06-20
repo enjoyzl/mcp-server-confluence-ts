@@ -541,6 +541,76 @@ async function main() {
       }
     );
 
+    server.tool(
+      "replyInlineComment",
+      {
+        commentId: z.string(),
+        pageId: z.string(),
+        content: z.string()
+      },
+      async ({ commentId, pageId, content }) => {
+        try {
+          logger.debug(`调用 replyInlineComment 工具，参数:`, { commentId, pageId });
+          const reply = await confluenceService.replyInlineComment({
+            commentId,
+            pageId,
+            content
+          });
+          return {
+            content: [{ 
+              type: "text",
+              text: JSON.stringify(reply, null, 2)
+            }]
+          };
+        } catch (error) {
+          const err = error as ErrorResponse;
+          return {
+            content: [{
+              type: "text",
+              text: `回复行内评论失败: ${err.message}`
+            }],
+            isError: true
+          };
+        }
+      }
+    );
+
+    server.tool(
+      "replyComment",
+      {
+        pageId: z.string(),
+        parentCommentId: z.string(),
+        content: z.string(),
+        watch: z.boolean().optional()
+      },
+      async ({ pageId, parentCommentId, content, watch }) => {
+        try {
+          logger.debug(`调用 replyComment 工具，参数:`, { pageId, parentCommentId, watch: watch || false });
+          const reply = await confluenceService.replyComment({
+            pageId,
+            parentCommentId,
+            content,
+            watch
+          });
+          return {
+            content: [{ 
+              type: "text",
+              text: JSON.stringify(reply, null, 2)
+            }]
+          };
+        } catch (error) {
+          const err = error as ErrorResponse;
+          return {
+            content: [{
+              type: "text",
+              text: `回复评论失败: ${err.message}`
+            }],
+            isError: true
+          };
+        }
+      }
+    );
+
     // 创建传输层
     const transport = new StdioServerTransport();
 

@@ -213,6 +213,14 @@ export interface UpdateCommentRequest {
   representation?: 'storage' | 'wiki' | 'editor2' | 'view';
 }
 
+// 回复评论请求参数
+export interface ReplyCommentRequest {
+  pageId: string;
+  parentCommentId: string;
+  content: string;
+  watch?: boolean;
+}
+
 // 行内评论信息
 export interface InlineComment {
   id: string;
@@ -255,4 +263,11 @@ export interface UpdateInlineCommentRequest {
   commentId: string;
   content: string;
   version?: number; // 可选，因为会从现有评论中获取
+}
+
+// 回复行内评论请求参数
+export interface ReplyInlineCommentRequest {
+  commentId: string;
+  pageId: string;
+  content: string;
 } 

@@ -10,9 +10,11 @@ import {
   CommentSearchResult,
   CreateCommentRequest,
   UpdateCommentRequest,
+  ReplyCommentRequest,
   InlineComment,
   CreateInlineCommentRequest,
-  UpdateInlineCommentRequest
+  UpdateInlineCommentRequest,
+  ReplyInlineCommentRequest
 } from '../types/confluence.types.js';
 import { ConfluenceClient, ConfluenceClientConfig } from './confluence-client.js';
 
@@ -835,6 +837,183 @@ export class ConfluenceService {
     return this.retryOperation(async () => {
       this.logger.debug('Deleting inline comment:', commentId);
       await this.client.delete(`/rest/inlinecomments/1.0/comments/${commentId}`);
+    });
+  }
+
+  /**
+   * 回复行内评论
+   */
+  public async replyInlineComment(request: ReplyInlineCommentRequest): Promise<InlineComment> {
+    const { commentId, pageId, content } = request;
+
+    if (!commentId || !pageId || !content) {
+      throw new Error('Comment ID, page ID and content are required');
+    }
+
+    return this.retryOperation(async () => {
+      this.logger.debug('Replying to inline comment:', { commentId, pageId, content: content.substring(0, 50) + '...' });
+
+      // 构造回复数据，按照用户提供的API格式
+      const data = {
+        body: `<p>${content}</p>`,
+        commentId: commentId,
+        hasDeletePermission: true,
+        hasEditPermission: true
+      };
+
+      // 使用行内评论回复专用API端点
+      const response = await this.client.post(
+        `/rest/inlinecomments/1.0/comments/${commentId}/replies?containerId=${pageId}`,
+        data,
+        {
+          timeout: 15000,
+          headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Accept': 'application/json; charset=utf-8',
+            'Accept-Charset': 'utf-8'
+          }
+        }
+      );
+
+      this.logger.debug('Inline comment reply created successfully:', response.data);
+      return response.data;
+    }, {
+      maxRetries: 2,
+      retryDelay: 1000
+    });
+  }
+
+  /**
+   * 回复普通评论
+   * 使用TinyMCE API，符合浏览器实际请求格式
+   */
+  public async replyComment(request: ReplyCommentRequest): Promise<ConfluenceComment> {
+    const { pageId, parentCommentId, content, watch = false } = request;
+
+    if (!pageId || !parentCommentId || !content) {
+      throw new Error('Page ID, parent comment ID and content are required');
+    }
+
+    return this.retryOperation(async () => {
+      this.logger.debug('Replying to comment:', { pageId, parentCommentId, content: content.substring(0, 50) + '...' });
+
+      // 获取XSRF token
+      const xsrfToken = await this.getXsrfToken(pageId);
+      this.logger.debug('XSRF token obtained for reply:', xsrfToken ? 'Yes' : 'No');
+
+      // 生成UUID（模仿浏览器行为）
+      const uuid = this.generateUUID();
+
+      // 构造HTML内容
+      const htmlContent = `<p>${content}</p>`;
+
+      // 根据用户提供的API格式构造表单数据
+      const formParams: Record<string, string> = {
+        html: htmlContent,
+        watch: watch.toString(),
+        uuid: uuid
+      };
+
+      // 添加XSRF token（如果获取到）
+      if (xsrfToken) {
+        formParams.atl_token = xsrfToken;
+      }
+
+      // 手动构造表单数据以确保正确的UTF-8编码
+      const formDataString = Object.entries(formParams)
+        .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+        .join('&');
+
+      // 使用用户提供的API端点格式
+      const endpoint = `/rest/tinymce/1/content/${pageId}/comments/${parentCommentId}/comment`;
+      const params = { actions: true };
+
+      // 记录表单数据，但避免记录敏感的token信息
+      this.logger.debug('Reply comment form data:', {
+        html: htmlContent,
+        watch: watch.toString(),
+        uuid: uuid,
+        hasToken: !!xsrfToken,
+        endpoint: endpoint
+      });
+
+      try {
+        const response = await this.client.post(endpoint, formDataString, {
+          params,
+          timeout: 15000,
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
+            'Accept': 'application/json; charset=utf-8',
+            'Accept-Charset': 'utf-8',
+            'X-Atlassian-Token': 'no-check', // 绕过XSRF检查
+            ...(xsrfToken && { 'X-XSRF-Token': xsrfToken }) // 同时提供token
+          }
+        });
+
+        this.logger.debug('Reply comment request succeeded:', response.data);
+
+        // TinyMCE端点返回的数据格式与标准API不同，需要转换
+        return {
+          id: response.data.id.toString(),
+          type: 'comment',
+          status: 'current',
+          title: `Re: Comment ${parentCommentId}`,
+          body: {
+            storage: {
+              value: response.data.html || htmlContent,
+              representation: 'storage'
+            }
+          },
+          version: {
+            number: 1,
+            by: {
+              username: response.data.authorUserName || 'unknown',
+              displayName: response.data.authorDisplayName || 'Unknown User'
+            },
+            when: response.data.created || new Date().toISOString(),
+            message: 'Reply to comment'
+          },
+          history: {
+            latest: true,
+            createdBy: {
+              username: response.data.authorUserName || 'unknown',
+              displayName: response.data.authorDisplayName || 'Unknown User'
+            },
+            createdDate: response.data.created || new Date().toISOString()
+          },
+          container: {
+            id: pageId,
+            type: 'page',
+            title: 'Page'
+          },
+          _links: {
+            webui: `/display/space/pageid?focusedCommentId=${response.data.id}`,
+            self: `/rest/api/content/${response.data.id}`
+          }
+        } as ConfluenceComment;
+
+      } catch (error: any) {
+        this.logger.error('Reply comment request failed:', {
+          status: error.response?.status,
+          message: error.message,
+          data: error.response?.data,
+          formData: formDataString
+        });
+
+        // 提供更友好的错误信息
+        if (error.response?.status === 403) {
+          throw new Error('Permission denied: You do not have permission to reply to comments on this page');
+        } else if (error.response?.status === 404) {
+          throw new Error('Comment not found: The parent comment or page does not exist');
+        } else if (error.response?.status === 400) {
+          throw new Error('Invalid request: Please check your comment content and try again');
+        }
+
+        throw new Error(`Reply comment failed: ${error.message}. Please try again later or contact administrator.`);
+      }
+    }, {
+      maxRetries: 2,
+      retryDelay: 1000
     });
   }
 } 
