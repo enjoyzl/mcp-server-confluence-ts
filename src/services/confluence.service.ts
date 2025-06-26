@@ -16,7 +16,20 @@ import {
   UpdateInlineCommentRequest,
   ReplyInlineCommentRequest
 } from '../types/confluence.types.js';
+import { CommentApiStrategy } from '../types/config.types.js';
 import { ConfluenceClient, ConfluenceClientConfig } from './confluence-client.js';
+
+/**
+ * 评论配置接口
+ */
+interface CommentConfig {
+  /** 评论API实现策略 */
+  apiStrategy?: CommentApiStrategy;
+  /** 是否启用回退机制 */
+  enableFallback?: boolean;
+  /** 请求超时时间 (毫秒) */
+  timeout?: number;
+}
 
 interface CacheItem<T> {
   data: T;
@@ -40,11 +53,22 @@ export class ConfluenceService {
   private readonly cache: Map<string, CacheItem<any>>;
   private readonly cacheTTL: number = 5 * 60 * 1000; // 5分钟缓存
   private readonly maxRetries: number = 3;
+  private readonly commentConfig: CommentConfig;
 
-  constructor(config: ConfluenceClientConfig) {
+  constructor(config: ConfluenceClientConfig & { commentConfig?: CommentConfig }) {
     this.logger = Logger.getInstance();
     this.cache = new Map();
     this.client = new ConfluenceClient(config);
+    
+    // 评论配置默认值
+    this.commentConfig = {
+      apiStrategy: CommentApiStrategy.STANDARD,
+      enableFallback: true,
+      timeout: 15000,
+      ...config.commentConfig
+    };
+    
+    this.logger.debug('ConfluenceService initialized with comment config:', this.commentConfig);
   }
 
   /**
@@ -227,21 +251,21 @@ export class ConfluenceService {
       });
       
       try {
-        const response = await this.client.get('/rest/api/content/search', {
-          params: {
-            cql,
-            limit,
-            start,
-            expand: 'space,history,version'
-          }
-        });
+      const response = await this.client.get('/rest/api/content/search', {
+        params: {
+          cql,
+          limit,
+          start,
+          expand: 'space,history,version'
+        }
+      });
         
         this.logger.debug('Search successful:', {
           totalSize: response.data.size,
           resultsCount: response.data.results?.length || 0
         });
         
-        return response.data;
+      return response.data;
       } catch (error: any) {
         this.logger.error('Search failed:', {
           originalQuery: query,
@@ -539,6 +563,127 @@ export class ConfluenceService {
     }
   }
 
+  // ========== 标准 REST API 实现 ==========
+
+  /**
+   * 使用标准REST API创建评论
+   */
+  private async createCommentWithStandardApi(
+    pageId: string,
+    content: string,
+    representation: string = 'storage',
+    parentCommentId?: string
+  ): Promise<ConfluenceComment> {
+    this.logger.debug('Creating comment with standard API:', { pageId, parentCommentId });
+
+    const data = {
+      type: 'comment',
+      container: { id: pageId },
+      body: {
+        [representation]: {
+          value: content,
+          representation
+        }
+      },
+      ...(parentCommentId && { ancestors: [{ id: parentCommentId }] })
+    };
+
+    const response = await this.client.post('/rest/api/content', data, {
+      timeout: this.commentConfig.timeout,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      }
+    });
+
+    this.logger.debug('Standard API comment creation succeeded:', response.data);
+    return response.data;
+  }
+
+  /**
+   * 使用标准REST API更新评论
+   */
+  private async updateCommentWithStandardApi(
+    commentId: string,
+    content: string,
+    version: number,
+    representation: string = 'storage'
+  ): Promise<ConfluenceComment> {
+    this.logger.debug('Updating comment with standard API:', { commentId, version });
+
+    const data = {
+      type: 'comment',
+      version: { number: version },
+      body: {
+        [representation]: {
+          value: content,
+          representation
+        }
+      }
+    };
+
+    const response = await this.client.put(`/rest/api/content/${commentId}`, data, {
+      timeout: this.commentConfig.timeout,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      }
+    });
+
+    this.logger.debug('Standard API comment update succeeded:', response.data);
+    return response.data;
+  }
+
+  /**
+   * 使用标准REST API删除评论
+   */
+  private async deleteCommentWithStandardApi(commentId: string): Promise<void> {
+    this.logger.debug('Deleting comment with standard API:', commentId);
+
+    await this.client.delete(`/rest/api/content/${commentId}`, {
+      timeout: this.commentConfig.timeout
+    });
+
+    this.logger.debug('Standard API comment deletion succeeded');
+  }
+
+  /**
+   * 使用标准REST API回复评论
+   */
+  private async replyCommentWithStandardApi(
+    pageId: string,
+    parentCommentId: string,
+    content: string,
+    representation: string = 'storage'
+  ): Promise<ConfluenceComment> {
+    this.logger.debug('Replying to comment with standard API:', { pageId, parentCommentId });
+
+    const data = {
+      type: 'comment',
+      container: { id: pageId },
+      ancestors: [{ id: parentCommentId }],
+      body: {
+        [representation]: {
+          value: content,
+          representation
+        }
+      }
+    };
+
+    const response = await this.client.post('/rest/api/content', data, {
+      timeout: this.commentConfig.timeout,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      }
+    });
+
+    this.logger.debug('Standard API comment reply succeeded:', response.data);
+    return response.data;
+  }
+
+  // ========== TinyMCE API 实现 ==========
+
   /**
    * 使用TinyMCE端点创建评论（Confluence 7.4优化版本）
    */
@@ -658,57 +803,43 @@ export class ConfluenceService {
     parentCommentId?: string
   ): Promise<ConfluenceComment> {
     return this.retryOperation(async () => {
-      this.logger.debug('Creating comment:', { pageId, parentCommentId });
+      this.logger.debug('Creating comment with strategy:', { 
+        pageId, 
+        parentCommentId, 
+        strategy: this.commentConfig.apiStrategy 
+      });
 
-      try {
-        // 优先使用TinyMCE端点（浏览器实际使用的方式）
-        this.logger.debug('Attempting TinyMCE endpoint first');
+      switch (this.commentConfig.apiStrategy) {
+        case CommentApiStrategy.STANDARD:
+          return await this.createCommentWithStandardApi(pageId, content, representation, parentCommentId);
+
+        case CommentApiStrategy.TINYMCE:
+          try {
         const tinyMceResult = await this.createCommentWithTinyMCE(pageId, content, parentCommentId);
-        
-        // TinyMCE端点返回的数据格式与标准API不同，需要转换
-        return {
-          id: tinyMceResult.id.toString(),
-          type: 'comment',
-          body: {
-            storage: {
-              value: tinyMceResult.html,
-              representation: 'storage'
+            return this.convertTinyMceToStandardFormat(tinyMceResult);
+          } catch (error: any) {
+            if (this.commentConfig.enableFallback) {
+              this.logger.warn('TinyMCE failed, falling back to standard API:', error.message);
+              return await this.createCommentWithStandardApi(pageId, content, representation, parentCommentId);
             }
-          },
-          version: {
-            number: 1
+            throw error;
           }
-        } as ConfluenceComment;
-        
+
+        case CommentApiStrategy.AUTO:
+        default:
+          try {
+            // 优先使用TinyMCE端点（浏览器实际使用的方式）
+            this.logger.debug('Attempting TinyMCE endpoint first');
+            const tinyMceResult = await this.createCommentWithTinyMCE(pageId, content, parentCommentId);
+            return this.convertTinyMceToStandardFormat(tinyMceResult);
       } catch (tinyMceError: any) {
         this.logger.warn('TinyMCE endpoint failed, falling back to standard API:', {
           error: tinyMceError.message,
           status: tinyMceError.response?.status
         });
 
-        // 备用方案：使用标准REST API
-        const data = {
-          type: 'comment',
-          container: { id: pageId },
-          body: {
-            [representation]: {
-              value: content,
-              representation
-            }
-          },
-          ...(parentCommentId && { ancestors: [{ id: parentCommentId }] })
-        };
-
-        try {
-          const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Comment creation timeout after 30 seconds')), 30000);
-          });
-
-          const createPromise = this.client.post('/rest/api/content', data);
-          
-          const response = await Promise.race([createPromise, timeoutPromise]) as any;
-          return response.data;
-          
+            try {
+              return await this.createCommentWithStandardApi(pageId, content, representation, parentCommentId);
         } catch (apiError: any) {
           this.logger.error('Both comment creation methods failed:', {
             tinyMceError: tinyMceError.message,
@@ -725,12 +856,52 @@ export class ConfluenceService {
           }
 
           throw new Error(`Comment creation failed: ${apiError.message || tinyMceError.message}. Please try again later or contact administrator.`);
+            }
         }
       }
     }, {
-      maxRetries: 1, // TinyMCE端点通常更可靠，减少重试
+      maxRetries: this.commentConfig.apiStrategy === CommentApiStrategy.STANDARD ? 2 : 1,
       retryDelay: 1000
     });
+  }
+
+  /**
+   * 将TinyMCE结果转换为标准格式
+   */
+  private convertTinyMceToStandardFormat(tinyMceResult: any): ConfluenceComment {
+    return {
+      id: tinyMceResult.id.toString(),
+      type: 'comment',
+      status: 'current',
+      title: `Comment ${tinyMceResult.id}`,
+      body: {
+        storage: {
+          value: tinyMceResult.html,
+          representation: 'storage'
+        }
+      },
+      version: {
+        number: 1,
+        by: {
+          username: tinyMceResult.authorUserName || 'unknown',
+          displayName: tinyMceResult.authorDisplayName || 'Unknown User'
+        },
+        when: tinyMceResult.created || new Date().toISOString(),
+        message: 'Created comment'
+      },
+      history: {
+        latest: true,
+        createdBy: {
+          username: tinyMceResult.authorUserName || 'unknown',
+          displayName: tinyMceResult.authorDisplayName || 'Unknown User'
+        },
+        createdDate: tinyMceResult.created || new Date().toISOString()
+      },
+      _links: {
+        webui: `/display/space/pageid?focusedCommentId=${tinyMceResult.id}`,
+        self: `/rest/api/content/${tinyMceResult.id}`
+      }
+    } as ConfluenceComment;
   }
 
   /**
@@ -744,7 +915,10 @@ export class ConfluenceService {
     }
 
     return this.retryOperation(async () => {
-      this.logger.debug('Updating comment:', { id });
+      this.logger.debug('Updating comment with strategy:', { 
+        id, 
+        strategy: this.commentConfig.apiStrategy 
+      });
 
       let currentVersion = version;
       
@@ -763,28 +937,34 @@ export class ConfluenceService {
         this.logger.debug('使用用户提供的版本号:', { version: currentVersion });
       }
 
-      const data = {
-        type: 'comment',
-        version: {
-          number: currentVersion
-        },
-        body: {
-          [representation]: {
-            value: content,
-            representation
-          }
-        }
-      };
-
-      this.logger.debug('更新评论数据:', { id, version: currentVersion, content: content.substring(0, 50) + '...' });
-
-      const response = await this.client.put(`/rest/api/content/${id}`, data);
+      // 对于更新评论，主要使用标准API，因为TinyMCE端点不支持更新
+      try {
+        const result = await this.updateCommentWithStandardApi(id, content, currentVersion, representation);
       
       // 清除缓存
       this.cache.delete(`comment:${id}`);
       
-      this.logger.debug('评论更新成功:', { id, newVersion: response.data.version?.number });
-      return response.data;
+        this.logger.debug('评论更新成功:', { id, newVersion: result.version?.number });
+        return result;
+      } catch (error: any) {
+        this.logger.error('Comment update failed:', {
+          id,
+          version: currentVersion,
+          error: error.message,
+          status: error.response?.status
+        });
+
+        // 提供更友好的错误信息
+        if (error.response?.status === 403) {
+          throw new Error('Permission denied: You do not have permission to update this comment');
+        } else if (error.response?.status === 404) {
+          throw new Error('Comment not found: The specified comment does not exist');
+        } else if (error.response?.status === 409) {
+          throw new Error('Version conflict: The comment has been modified by another user. Please refresh and try again.');
+        }
+
+        throw new Error(`Comment update failed: ${error.message}. Please try again later or contact administrator.`);
+      }
     });
   }
 
@@ -797,11 +977,35 @@ export class ConfluenceService {
     }
 
     return this.retryOperation(async () => {
-      this.logger.debug('Deleting comment:', commentId);
-      await this.client.delete(`/rest/api/content/${commentId}`);
+      this.logger.debug('Deleting comment with strategy:', { 
+        commentId, 
+        strategy: this.commentConfig.apiStrategy 
+      });
+
+      try {
+        // 删除评论主要使用标准API，因为更稳定
+        await this.deleteCommentWithStandardApi(commentId);
       
       // 清除缓存
       this.cache.delete(`comment:${commentId}`);
+        
+        this.logger.debug('Comment deleted successfully:', commentId);
+      } catch (error: any) {
+        this.logger.error('Comment deletion failed:', {
+          commentId,
+          error: error.message,
+          status: error.response?.status
+        });
+
+        // 提供更友好的错误信息
+        if (error.response?.status === 403) {
+          throw new Error('Permission denied: You do not have permission to delete this comment');
+        } else if (error.response?.status === 404) {
+          throw new Error('Comment not found: The specified comment does not exist or has already been deleted');
+        }
+
+        throw new Error(`Comment deletion failed: ${error.message}. Please try again later or contact administrator.`);
+      }
     });
   }
 
@@ -840,7 +1044,7 @@ export class ConfluenceService {
   // ========== 行内评论功能 ==========
 
   /**
-   * 创建行内评论
+   * 创建行内评论 - 支持多种API策略
    */
   public async createInlineComment(
     pageId: string,
@@ -856,40 +1060,60 @@ export class ConfluenceService {
     }
 
     return this.retryOperation(async () => {
-      this.logger.debug('Creating inline comment:', { pageId, originalSelection, matchIndex });
-
-      // 构造请求数据，按照API格式
-      const data = {
-        originalSelection,
-        body: `<p>${content}</p>`,
-        matchIndex: matchIndex || 0,
-        numMatches: numMatches || 1,
-        serializedHighlights: serializedHighlights || `[["${originalSelection}","123:1:0:0",0,${originalSelection.length}]]`,
-        containerId: pageId,
-        parentCommentId: parentCommentId || "0",
-        lastFetchTime: Date.now().toString(),
-        hasDeletePermission: true,
-        hasEditPermission: true,
-        hasResolvePermission: true,
-        resolveProperties: {
-          resolved: false,
-          resolvedTime: 0
-        },
-        deleted: false
-      };
-
-      // 使用行内评论专用API端点
-      const response = await this.client.post('/rest/inlinecomments/1.0/comments', data, {
-        timeout: 15000,
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Accept': 'application/json; charset=utf-8',
-          'Accept-Charset': 'utf-8'
-        }
+      this.logger.debug('Creating inline comment with strategy:', { 
+        pageId, 
+        originalSelection, 
+        matchIndex,
+        strategy: this.commentConfig.apiStrategy 
       });
 
-      this.logger.debug('Inline comment created successfully:', response.data);
-      return response.data;
+      switch (this.commentConfig.apiStrategy) {
+        case CommentApiStrategy.STANDARD:
+          return await this.createInlineCommentWithStandardApi(
+            pageId, content, originalSelection, matchIndex, numMatches, parentCommentId
+          );
+
+        case CommentApiStrategy.TINYMCE:
+          try {
+            return await this.createInlineCommentWithCustomApi(
+              pageId, content, originalSelection, matchIndex, numMatches, serializedHighlights, parentCommentId
+            );
+          } catch (error: any) {
+            if (this.commentConfig.enableFallback) {
+              this.logger.warn('Custom API failed, falling back to standard API:', error.message);
+              return await this.createInlineCommentWithStandardApi(
+                pageId, content, originalSelection, matchIndex, numMatches, parentCommentId
+              );
+            }
+            throw error;
+          }
+
+        case CommentApiStrategy.AUTO:
+        default:
+          try {
+            // 优先使用自定义端点
+            return await this.createInlineCommentWithCustomApi(
+              pageId, content, originalSelection, matchIndex, numMatches, serializedHighlights, parentCommentId
+            );
+          } catch (customError: any) {
+            this.logger.warn('Custom API failed, falling back to standard API:', {
+              error: customError.message,
+              status: customError.response?.status
+            });
+
+            try {
+              return await this.createInlineCommentWithStandardApi(
+                pageId, content, originalSelection, matchIndex, numMatches, parentCommentId
+              );
+            } catch (apiError: any) {
+              this.logger.error('Both APIs failed for inline comment creation:', {
+                customError: customError.message,
+                apiError: apiError.message
+              });
+              throw new Error(`Failed to create inline comment: ${apiError.message}`);
+            }
+          }
+      }
     }, {
       maxRetries: 2,
       retryDelay: 1000
@@ -897,18 +1121,200 @@ export class ConfluenceService {
   }
 
   /**
-   * 更新行内评论
-   * 注意：由于Confluence行内评论API限制，此功能暂时不可用
-   * 建议删除原评论后重新创建新评论
+   * 使用标准API创建行内评论
    */
-  public async updateInlineComment(request: UpdateInlineCommentRequest): Promise<InlineComment> {
-    const { commentId, content } = request;
+  private async createInlineCommentWithStandardApi(
+    pageId: string,
+    content: string,
+    originalSelection: string,
+    matchIndex?: number,
+    numMatches?: number,
+    parentCommentId?: string
+  ): Promise<InlineComment> {
+    const requestData = {
+      pageId: pageId,
+      parentCommentId: parentCommentId || undefined,
+      body: {
+        representation: 'storage',
+        value: `<p>${content}</p>`
+      },
+      inlineCommentProperties: {
+        textSelection: originalSelection,
+        textSelectionMatchIndex: matchIndex || 0,
+        textSelectionMatchCount: numMatches || 1
+      }
+    };
 
-    throw new Error('行内评论更新功能暂时不可用。由于Confluence API限制，无法真正更新行内评论，只能创建新评论，这会导致重复评论问题。建议：1）删除原评论，2）创建新的行内评论。');
+    const response = await this.client.post('/wiki/api/v2/inline-comments', requestData, {
+      timeout: 15000,
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Accept': 'application/json; charset=utf-8'
+      }
+    });
+
+    this.logger.debug('Inline comment created successfully with standard API:', response.data);
+    return response.data;
   }
 
   /**
-   * 删除行内评论
+   * 使用自定义API创建行内评论
+   */
+  private async createInlineCommentWithCustomApi(
+    pageId: string,
+    content: string,
+    originalSelection: string,
+    matchIndex?: number,
+    numMatches?: number,
+    serializedHighlights?: string,
+    parentCommentId?: string
+  ): Promise<InlineComment> {
+    const requestData = {
+      originalSelection,
+      body: `<p>${content}</p>`,
+      matchIndex: matchIndex || 0,
+      numMatches: numMatches || 1,
+      serializedHighlights: serializedHighlights || JSON.stringify([]),
+      containerId: pageId,
+      parentCommentId: parentCommentId || '0',
+      lastFetchTime: new Date().getTime(),
+      hasDeletePermission: true,
+      hasEditPermission: true,
+      hasResolvePermission: true,
+      resolveProperties: {},
+      deleted: false
+    };
+
+    const response = await this.client.post('/rest/inlinecomments/1.0/comments', requestData, {
+      timeout: 15000,
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Accept': 'application/json; charset=utf-8'
+      }
+    });
+
+    this.logger.debug('Inline comment created successfully with custom API:', response.data);
+    return response.data;
+  }
+
+  /**
+   * 更新行内评论 - 支持多种API策略
+   */
+  public async updateInlineComment(request: UpdateInlineCommentRequest): Promise<InlineComment> {
+    const { commentId, content, version } = request;
+
+    if (!commentId || !content) {
+      throw new Error('Comment ID and content are required');
+    }
+
+    return this.retryOperation(async () => {
+      this.logger.debug('Updating inline comment with strategy:', { 
+        commentId, 
+        content: content.substring(0, 50) + '...',
+        strategy: this.commentConfig.apiStrategy 
+      });
+
+      switch (this.commentConfig.apiStrategy) {
+        case CommentApiStrategy.STANDARD:
+          return await this.updateInlineCommentWithStandardApi(commentId, content, version);
+
+        case CommentApiStrategy.TINYMCE:
+          try {
+            return await this.updateInlineCommentWithCustomApi(commentId, content, version);
+          } catch (error: any) {
+            if (this.commentConfig.enableFallback) {
+              this.logger.warn('Custom API failed, falling back to standard API:', error.message);
+              return await this.updateInlineCommentWithStandardApi(commentId, content, version);
+            }
+            throw error;
+          }
+
+        case CommentApiStrategy.AUTO:
+        default:
+          try {
+            // 优先使用自定义端点
+            return await this.updateInlineCommentWithCustomApi(commentId, content, version);
+          } catch (customError: any) {
+            this.logger.warn('Custom API failed, falling back to standard API:', {
+              error: customError.message,
+              status: customError.response?.status
+            });
+
+            try {
+              return await this.updateInlineCommentWithStandardApi(commentId, content, version);
+            } catch (apiError: any) {
+              this.logger.error('Both APIs failed for inline comment update:', {
+                customError: customError.message,
+                apiError: apiError.message
+              });
+              throw new Error(`Failed to update inline comment: ${apiError.message}`);
+            }
+          }
+      }
+    }, {
+      maxRetries: 2,
+      retryDelay: 1000
+    });
+  }
+
+  /**
+   * 使用标准API更新行内评论
+   */
+  private async updateInlineCommentWithStandardApi(
+    commentId: string,
+    content: string,
+    version?: number
+  ): Promise<InlineComment> {
+    const requestData = {
+      version: {
+        number: version || 1,
+        message: `Update inline comment ${commentId}`
+      },
+      body: {
+        representation: 'storage',
+        value: `<p>${content}</p>`
+      }
+    };
+
+    const response = await this.client.put(`/wiki/api/v2/inline-comments/${commentId}`, requestData, {
+      timeout: 15000,
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Accept': 'application/json; charset=utf-8'
+      }
+    });
+
+    this.logger.debug('Inline comment updated successfully with standard API:', response.data);
+    return response.data;
+  }
+
+  /**
+   * 使用自定义API更新行内评论
+   */
+  private async updateInlineCommentWithCustomApi(
+    commentId: string,
+    content: string,
+    version?: number
+  ): Promise<InlineComment> {
+    const requestData = {
+      body: `<p>${content}</p>`,
+      version: version || 1
+    };
+
+    const response = await this.client.put(`/rest/inlinecomments/1.0/comments/${commentId}`, requestData, {
+      timeout: 15000,
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Accept': 'application/json; charset=utf-8'
+      }
+    });
+
+    this.logger.debug('Inline comment updated successfully with custom API:', response.data);
+    return response.data;
+  }
+
+  /**
+   * 删除行内评论 - 支持多种API策略
    */
   public async deleteInlineComment(commentId: string): Promise<void> {
     if (!commentId) {
@@ -916,13 +1322,72 @@ export class ConfluenceService {
     }
 
     return this.retryOperation(async () => {
-      this.logger.debug('Deleting inline comment:', commentId);
-      await this.client.delete(`/rest/inlinecomments/1.0/comments/${commentId}`);
+      this.logger.debug('Deleting inline comment with strategy:', { 
+        commentId,
+        strategy: this.commentConfig.apiStrategy 
+      });
+
+      switch (this.commentConfig.apiStrategy) {
+        case CommentApiStrategy.STANDARD:
+          return await this.deleteInlineCommentWithStandardApi(commentId);
+
+        case CommentApiStrategy.TINYMCE:
+          try {
+            return await this.deleteInlineCommentWithCustomApi(commentId);
+          } catch (error: any) {
+            if (this.commentConfig.enableFallback) {
+              this.logger.warn('Custom API failed, falling back to standard API:', error.message);
+              return await this.deleteInlineCommentWithStandardApi(commentId);
+            }
+            throw error;
+          }
+
+        case CommentApiStrategy.AUTO:
+        default:
+          try {
+            // 优先使用自定义端点
+            return await this.deleteInlineCommentWithCustomApi(commentId);
+          } catch (customError: any) {
+            this.logger.warn('Custom API failed, falling back to standard API:', {
+              error: customError.message,
+              status: customError.response?.status
+            });
+
+            try {
+              return await this.deleteInlineCommentWithStandardApi(commentId);
+            } catch (apiError: any) {
+              this.logger.error('Both APIs failed for inline comment deletion:', {
+                customError: customError.message,
+                apiError: apiError.message
+              });
+              throw new Error(`Failed to delete inline comment: ${apiError.message}`);
+            }
+          }
+      }
+    }, {
+      maxRetries: 2,
+      retryDelay: 1000
     });
   }
 
   /**
-   * 回复行内评论
+   * 使用标准API删除行内评论
+   */
+  private async deleteInlineCommentWithStandardApi(commentId: string): Promise<void> {
+    await this.client.delete(`/wiki/api/v2/inline-comments/${commentId}`);
+    this.logger.debug('Inline comment deleted successfully with standard API');
+  }
+
+  /**
+   * 使用自定义API删除行内评论
+   */
+  private async deleteInlineCommentWithCustomApi(commentId: string): Promise<void> {
+    await this.client.delete(`/rest/inlinecomments/1.0/comments/${commentId}`);
+    this.logger.debug('Inline comment deleted successfully with custom API');
+  }
+
+  /**
+   * 回复行内评论 - 支持多种API策略
    */
   public async replyInlineComment(request: ReplyInlineCommentRequest): Promise<InlineComment> {
     const { commentId, pageId, content } = request;
@@ -932,32 +1397,50 @@ export class ConfluenceService {
     }
 
     return this.retryOperation(async () => {
-      this.logger.debug('Replying to inline comment:', { commentId, pageId, content: content.substring(0, 50) + '...' });
+      this.logger.debug('Replying to inline comment with strategy:', { 
+        commentId, 
+        pageId, 
+        content: content.substring(0, 50) + '...',
+        strategy: this.commentConfig.apiStrategy 
+      });
 
-      // 构造回复数据，按照用户提供的API格式
-      const data = {
-        body: `<p>${content}</p>`,
-        commentId: commentId,
-        hasDeletePermission: true,
-        hasEditPermission: true
-      };
+      switch (this.commentConfig.apiStrategy) {
+        case CommentApiStrategy.STANDARD:
+          return await this.replyInlineCommentWithStandardApi(commentId, pageId, content);
 
-      // 使用行内评论回复专用API端点
-      const response = await this.client.post(
-        `/rest/inlinecomments/1.0/comments/${commentId}/replies?containerId=${pageId}`,
-        data,
-        {
-          timeout: 15000,
-          headers: {
-            'Content-Type': 'application/json; charset=utf-8',
-            'Accept': 'application/json; charset=utf-8',
-            'Accept-Charset': 'utf-8'
+        case CommentApiStrategy.TINYMCE:
+          try {
+            return await this.replyInlineCommentWithCustomApi(commentId, pageId, content);
+          } catch (error: any) {
+            if (this.commentConfig.enableFallback) {
+              this.logger.warn('Custom API failed, falling back to standard API:', error.message);
+              return await this.replyInlineCommentWithStandardApi(commentId, pageId, content);
+            }
+            throw error;
           }
-        }
-      );
 
-      this.logger.debug('Inline comment reply created successfully:', response.data);
-      return response.data;
+        case CommentApiStrategy.AUTO:
+        default:
+          try {
+            // 优先使用自定义端点
+            return await this.replyInlineCommentWithCustomApi(commentId, pageId, content);
+          } catch (customError: any) {
+            this.logger.warn('Custom API failed, falling back to standard API:', {
+              error: customError.message,
+              status: customError.response?.status
+            });
+
+            try {
+              return await this.replyInlineCommentWithStandardApi(commentId, pageId, content);
+            } catch (apiError: any) {
+              this.logger.error('Both APIs failed for inline comment reply:', {
+                customError: customError.message,
+                apiError: apiError.message
+              });
+              throw new Error(`Failed to reply to inline comment: ${apiError.message}`);
+            }
+          }
+      }
     }, {
       maxRetries: 2,
       retryDelay: 1000
@@ -965,8 +1448,62 @@ export class ConfluenceService {
   }
 
   /**
+   * 使用标准API回复行内评论
+   */
+  private async replyInlineCommentWithStandardApi(
+    commentId: string,
+    pageId: string,
+    content: string
+  ): Promise<InlineComment> {
+    const requestData = {
+      pageId: pageId,
+      parentCommentId: commentId,
+      body: {
+        representation: 'storage',
+        value: `<p>${content}</p>`
+      }
+    };
+
+    const response = await this.client.post('/wiki/api/v2/inline-comments', requestData, {
+      timeout: 15000,
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Accept': 'application/json; charset=utf-8'
+      }
+    });
+
+    this.logger.debug('Inline comment reply created successfully with standard API:', response.data);
+    return response.data;
+  }
+
+  /**
+   * 使用自定义API回复行内评论
+   */
+  private async replyInlineCommentWithCustomApi(
+    commentId: string,
+    pageId: string,
+    content: string
+  ): Promise<InlineComment> {
+    const requestData = {
+      body: `<p>${content}</p>`,
+      containerId: pageId,
+      parentCommentId: commentId
+    };
+
+    const response = await this.client.post('/rest/inlinecomments/1.0/comments', requestData, {
+      timeout: 15000,
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Accept': 'application/json; charset=utf-8'
+      }
+    });
+
+    this.logger.debug('Inline comment reply created successfully with custom API:', response.data);
+    return response.data;
+  }
+
+  /**
    * 回复普通评论
-   * 使用TinyMCE API，符合浏览器实际请求格式
    */
   public async replyComment(request: ReplyCommentRequest): Promise<ConfluenceComment> {
     const { pageId, parentCommentId, content, watch = false } = request;
@@ -976,8 +1513,75 @@ export class ConfluenceService {
     }
 
     return this.retryOperation(async () => {
-      this.logger.debug('Replying to comment:', { pageId, parentCommentId, content: content.substring(0, 50) + '...' });
+      this.logger.debug('Replying to comment with strategy:', { 
+        pageId, 
+        parentCommentId, 
+        content: content.substring(0, 50) + '...',
+        strategy: this.commentConfig.apiStrategy 
+      });
 
+      switch (this.commentConfig.apiStrategy) {
+        case CommentApiStrategy.STANDARD:
+          return await this.replyCommentWithStandardApi(pageId, parentCommentId, content);
+
+        case CommentApiStrategy.TINYMCE:
+          try {
+            const tinyMceResult = await this.replyCommentWithTinyMCE(pageId, parentCommentId, content, watch);
+            return tinyMceResult;
+          } catch (error: any) {
+            if (this.commentConfig.enableFallback) {
+              this.logger.warn('TinyMCE reply failed, falling back to standard API:', error.message);
+              return await this.replyCommentWithStandardApi(pageId, parentCommentId, content);
+            }
+            throw error;
+          }
+
+        case CommentApiStrategy.AUTO:
+        default:
+          try {
+            // 优先使用TinyMCE端点
+            const tinyMceResult = await this.replyCommentWithTinyMCE(pageId, parentCommentId, content, watch);
+            return tinyMceResult;
+          } catch (tinyMceError: any) {
+            this.logger.warn('TinyMCE reply failed, falling back to standard API:', {
+              error: tinyMceError.message,
+              status: tinyMceError.response?.status
+            });
+
+            try {
+              return await this.replyCommentWithStandardApi(pageId, parentCommentId, content);
+            } catch (apiError: any) {
+              this.logger.error('Both reply methods failed:', {
+                tinyMceError: tinyMceError.message,
+                apiError: apiError.message
+              });
+
+              // 提供更友好的错误信息
+              if (apiError.response?.status === 403 || tinyMceError.response?.status === 403) {
+                throw new Error('Permission denied: You do not have permission to reply to comments on this page');
+              } else if (apiError.response?.status === 404 || tinyMceError.response?.status === 404) {
+                throw new Error('Comment not found: The parent comment or page does not exist');
+              }
+
+              throw new Error(`Reply comment failed: ${apiError.message || tinyMceError.message}. Please try again later or contact administrator.`);
+            }
+          }
+      }
+    }, {
+      maxRetries: this.commentConfig.apiStrategy === CommentApiStrategy.STANDARD ? 2 : 1,
+      retryDelay: 1000
+    });
+  }
+
+  /**
+   * 使用TinyMCE API回复评论
+   */
+  private async replyCommentWithTinyMCE(
+    pageId: string,
+    parentCommentId: string,
+    content: string,
+    watch: boolean = false
+  ): Promise<ConfluenceComment> {
       // 获取XSRF token
       const xsrfToken = await this.getXsrfToken(pageId);
       this.logger.debug('XSRF token obtained for reply:', xsrfToken ? 'Yes' : 'No');
@@ -1009,19 +1613,9 @@ export class ConfluenceService {
       const endpoint = `/rest/tinymce/1/content/${pageId}/comments/${parentCommentId}/comment`;
       const params = { actions: true };
 
-      // 记录表单数据，但避免记录敏感的token信息
-      this.logger.debug('Reply comment form data:', {
-        html: htmlContent,
-        watch: watch.toString(),
-        uuid: uuid,
-        hasToken: !!xsrfToken,
-        endpoint: endpoint
-      });
-
-      try {
         const response = await this.client.post(endpoint, formDataString, {
           params,
-          timeout: 15000,
+      timeout: this.commentConfig.timeout,
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
             'Accept': 'application/json; charset=utf-8',
@@ -1031,7 +1625,7 @@ export class ConfluenceService {
           }
         });
 
-        this.logger.debug('Reply comment request succeeded:', response.data);
+    this.logger.debug('TinyMCE reply request succeeded:', response.data);
 
         // TinyMCE端点返回的数据格式与标准API不同，需要转换
         return {
@@ -1072,29 +1666,5 @@ export class ConfluenceService {
             self: `/rest/api/content/${response.data.id}`
           }
         } as ConfluenceComment;
-
-      } catch (error: any) {
-        this.logger.error('Reply comment request failed:', {
-          status: error.response?.status,
-          message: error.message,
-          data: error.response?.data,
-          formData: formDataString
-        });
-
-        // 提供更友好的错误信息
-        if (error.response?.status === 403) {
-          throw new Error('Permission denied: You do not have permission to reply to comments on this page');
-        } else if (error.response?.status === 404) {
-          throw new Error('Comment not found: The parent comment or page does not exist');
-        } else if (error.response?.status === 400) {
-          throw new Error('Invalid request: Please check your comment content and try again');
-        }
-
-        throw new Error(`Reply comment failed: ${error.message}. Please try again later or contact administrator.`);
-      }
-    }, {
-      maxRetries: 2,
-      retryDelay: 1000
-    });
   }
-} 
+}

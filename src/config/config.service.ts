@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 import { z } from 'zod';
 import { Logger } from '../utils/logger.js';
-import { AppConfig, ServerConfig } from '../types/config.types.js';
+import { AppConfig, ServerConfig, CommentConfig, CommentApiStrategy } from '../types/config.types.js';
 
 // 加载环境变量
 dotenv.config();
@@ -15,6 +15,13 @@ const serverSchema = z.object({
   timeout: z.number().int().positive().default(10000)
 });
 
+// 评论配置模式
+const commentSchema = z.object({
+  apiStrategy: z.enum(['tinymce', 'standard', 'auto']).default('standard'),
+  enableFallback: z.boolean().default(true),
+  timeout: z.number().int().positive().default(15000)
+});
+
 // 应用配置模式
 const configSchema = z.object({
   baseUrl: z.string().url(),
@@ -23,7 +30,8 @@ const configSchema = z.object({
   accessToken: z.string().optional(),
   timeout: z.number().int().positive().optional(),
   rejectUnauthorized: z.boolean().optional(),
-  server: serverSchema
+  server: serverSchema,
+  comment: commentSchema
 });
 
 /**
@@ -60,6 +68,13 @@ export class ConfigService {
   }
 
   /**
+   * 获取评论配置
+   */
+  public getCommentConfig(): CommentConfig {
+    return this._config.comment;
+  }
+
+  /**
    * 创建配置实例
    */
   private createConfig(): AppConfig {
@@ -75,6 +90,11 @@ export class ConfigService {
           port: parseInt(process.env.PORT || '3000'),
           env: process.env.NODE_ENV as 'development' | 'production' || 'development',
           timeout: parseInt(process.env.SERVER_TIMEOUT || '10000')
+        },
+        comment: {
+          apiStrategy: process.env.COMMENT_API_STRATEGY || 'standard',
+          enableFallback: process.env.COMMENT_ENABLE_FALLBACK !== 'false',
+          timeout: parseInt(process.env.COMMENT_TIMEOUT || '15000')
         }
       });
 
@@ -83,8 +103,17 @@ export class ConfigService {
         throw new Error('Either CONFLUENCE_ACCESS_TOKEN or both CONFLUENCE_USERNAME and CONFLUENCE_PASSWORD must be provided');
       }
 
+      // 转换字符串策略为枚举
+      const convertedConfig: AppConfig = {
+        ...config,
+        comment: {
+          ...config.comment,
+          apiStrategy: config.comment.apiStrategy as CommentApiStrategy
+        }
+      };
+
       logger.debug('Configuration loaded successfully');
-      return config;
+      return convertedConfig;
     } catch (error) {
       if (error instanceof z.ZodError) {
         logger.error('Configuration validation failed:', error.errors);

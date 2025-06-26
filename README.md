@@ -637,4 +637,64 @@ interface ErrorResponse {
 
 ## 许可证
 
-[MIT License](LICENSE) 
+[MIT License](LICENSE)
+
+## 配置
+
+### 环境变量配置
+
+在项目根目录创建 `.env` 文件，配置以下参数：
+
+```env
+# Confluence 连接配置
+CONFLUENCE_URL=https://your-confluence.com
+CONFLUENCE_USERNAME=your-username
+CONFLUENCE_PASSWORD=your-password
+# 或者使用访问令牌
+CONFLUENCE_ACCESS_TOKEN=your-access-token
+
+# 服务器配置
+PORT=3000
+NODE_ENV=development
+SERVER_TIMEOUT=10000
+
+# 评论 API 策略配置
+COMMENT_API_STRATEGY=standard
+COMMENT_ENABLE_FALLBACK=true
+COMMENT_TIMEOUT=15000
+```
+
+### 评论策略配置说明
+
+评论功能支持三种API实现策略，可通过环境变量 `COMMENT_API_STRATEGY` 配置：
+
+#### 1. `standard` (默认，推荐)
+- 使用标准 REST API
+- 兼容性好，适合 Confluence 7.4+
+- 稳定性高，适合生产环境
+
+#### 2. `tinymce`
+- 使用 TinyMCE 端点
+- 功能更丰富，模拟浏览器行为
+- 支持更复杂的评论功能
+
+#### 3. `auto`
+- 自动选择策略
+- 优先使用 TinyMCE，失败时回退到标准 API
+- 平衡功能性和兼容性
+
+#### 其他评论配置
+
+- `COMMENT_ENABLE_FALLBACK`: 是否启用回退机制 (默认: true)
+  - `true`: 当首选API失败时，自动尝试备用API
+  - `false`: 只使用指定的API，失败时直接抛出错误
+
+- `COMMENT_TIMEOUT`: 评论请求超时时间，单位毫秒 (默认: 15000)
+  - 建议标准API使用 10-15 秒
+  - TinyMCE API 由于需要获取token等步骤，建议 15-20 秒
+
+#### Confluence 7.4 特别说明
+
+- 标准API在7.4版本中稳定性更好
+- TinyMCE API提供更丰富的功能，但可能有兼容性问题
+- 建议在生产环境使用 `standard` 策略，开发环境可根据需要选择 

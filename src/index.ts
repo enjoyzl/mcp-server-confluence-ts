@@ -35,13 +35,15 @@ async function main() {
 
     // 创建 Confluence 服务实例
     const config = configService.getConfig();
+    const commentConfig = configService.getCommentConfig();
     const confluenceService = new ConfluenceService({
       baseUrl: config.baseUrl,
       username: config.username,
       password: config.password,
       accessToken: config.accessToken,
       timeout: config.timeout,
-      rejectUnauthorized: config.rejectUnauthorized
+      rejectUnauthorized: config.rejectUnauthorized,
+      commentConfig: commentConfig
     });
 
     // ===========================================
@@ -106,7 +108,7 @@ async function main() {
     // ===========================================
     // 2. 页面管理工具 - 核心功能
     // ===========================================
-    
+
     server.tool(
       "managePages",
       {
@@ -135,12 +137,12 @@ async function main() {
                 throw new Error('创建页面需要 spaceKey、title 和 content 参数');
               }
               result = await confluenceService.createPage({
-                spaceKey,
-                title,
-                content,
-                parentId,
-                representation
-              });
+            spaceKey,
+            title,
+            content,
+            parentId,
+            representation
+          });
               break;
               
             case 'update':
@@ -204,7 +206,7 @@ async function main() {
     // ===========================================
     // 3. 评论管理工具 - 扩展功能
     // ===========================================
-    
+
     server.tool(
       "manageComments",
       {
@@ -274,10 +276,10 @@ async function main() {
                 }
                 result = await confluenceService.updateComment({
                   id: commentId,
-                  content,
-                  version,
-                  representation
-                });
+            content,
+            version,
+            representation
+          });
               }
               break;
               
@@ -399,7 +401,7 @@ async function main() {
     // ===========================================
     // 4. 搜索工具 - 专用搜索功能
     // ===========================================
-    
+
     server.tool(
       "searchContent",
       { query: z.string().describe('搜索关键词（支持中文和英文，将自动转换为CQL格式）') },
