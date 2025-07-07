@@ -120,7 +120,7 @@ async function main() {
         content: z.string().optional().describe('页面内容（用于create操作必填，update操作可选）'),
         // 创建/更新页面参数
         parentId: z.string().optional().describe('父页面ID（可选，用于创建子页面）'),
-        representation: z.enum(['storage', 'wiki', 'editor2', 'view']).optional().describe('内容格式: storage=HTML存储格式（推荐）, wiki=Wiki标记语法, editor2=编辑器格式, view=查看格式'),
+        representation: z.enum(['storage', 'wiki', 'editor2', 'view', 'markdown']).optional().describe('内容格式: storage=HTML存储格式（推荐）, wiki=Wiki标记语法, editor2=编辑器格式, view=查看格式, markdown=Markdown格式'),
         version: z.number().optional().describe('页面版本号（用于update操作，建议填写以避免冲突）'),
         // 获取页面参数
         expand: z.string().optional().describe('扩展参数（可选，用于指定返回额外信息，如：body.storage,version,space）')
@@ -217,7 +217,7 @@ async function main() {
         commentId: z.string().optional().describe('评论ID（用于update/delete操作必填，行内评论reply时必填）'),
         content: z.string().optional().describe('评论内容（用于create/update/reply操作必填）'),
         // 普通评论参数
-        representation: z.enum(['storage', 'wiki', 'editor2', 'view']).optional().describe('内容格式: storage=HTML存储格式（推荐）, wiki=Wiki标记语法, editor2=编辑器格式, view=查看格式'),
+        representation: z.enum(['storage', 'wiki', 'editor2', 'view', 'markdown']).optional().describe('内容格式: storage=HTML存储格式（推荐）, wiki=Wiki标记语法, editor2=编辑器格式, view=查看格式, markdown=Markdown格式'),
         parentCommentId: z.string().optional().describe('父评论ID（用于普通评论的reply操作必填，或创建子评论）'),
         version: z.number().optional().describe('评论版本号（用于update操作，建议填写以避免冲突）'),
         watch: z.boolean().optional().describe('是否监视评论（布尔值，默认false，用于reply操作）'),

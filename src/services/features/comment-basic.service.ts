@@ -6,6 +6,7 @@ import {
 } from '../../types/confluence.types.js';
 import { CommentApiStrategy } from '../../types/config.types.js';
 import { BaseService } from '../base.service.js';
+import { MarkdownUtils } from '../../utils/markdown.js';
 
 /**
  * 评论服务类
@@ -102,6 +103,15 @@ export class CommentService extends BaseService {
     representation: string = 'storage',
     parentCommentId?: string
   ): Promise<ConfluenceComment> {
+    // 只有明确指定为 markdown 时才进行处理
+    let finalContent = content;
+    let finalRepresentation = representation;
+    
+    if (representation === 'markdown') {
+      const processedContent = MarkdownUtils.prepareContentForConfluence(content, representation as any);
+      finalContent = processedContent.content;
+      finalRepresentation = processedContent.representation;
+    }
     return this.retryOperation(async () => {
       this.logger.debug('Creating comment with strategy:', { 
         pageId, 
@@ -111,16 +121,16 @@ export class CommentService extends BaseService {
 
       switch (this.commentConfig.apiStrategy) {
         case CommentApiStrategy.STANDARD:
-          return await this.createCommentWithStandardApi(pageId, content, representation, parentCommentId);
+          return await this.createCommentWithStandardApi(pageId, finalContent, finalRepresentation, parentCommentId);
 
         case CommentApiStrategy.TINYMCE:
           try {
-            const tinyMceResult = await this.createCommentWithTinyMCE(pageId, content, parentCommentId);
+            const tinyMceResult = await this.createCommentWithTinyMCE(pageId, finalContent, parentCommentId);
             return this.convertTinyMceToStandardFormat(tinyMceResult);
           } catch (error: any) {
             if (this.commentConfig.enableFallback) {
               this.logger.warn('TinyMCE failed, falling back to standard API:', error.message);
-              return await this.createCommentWithStandardApi(pageId, content, representation, parentCommentId);
+              return await this.createCommentWithStandardApi(pageId, finalContent, finalRepresentation, parentCommentId);
             }
             throw error;
           }
@@ -128,7 +138,7 @@ export class CommentService extends BaseService {
         case CommentApiStrategy.AUTO:
         default:
           try {
-            const tinyMceResult = await this.createCommentWithTinyMCE(pageId, content, parentCommentId);
+            const tinyMceResult = await this.createCommentWithTinyMCE(pageId, finalContent, parentCommentId);
             return this.convertTinyMceToStandardFormat(tinyMceResult);
           } catch (tinyMceError: any) {
             this.logger.warn('TinyMCE endpoint failed, falling back to standard API:', {
@@ -137,7 +147,7 @@ export class CommentService extends BaseService {
             });
 
             try {
-              return await this.createCommentWithStandardApi(pageId, content, representation, parentCommentId);
+              return await this.createCommentWithStandardApi(pageId, finalContent, finalRepresentation, parentCommentId);
             } catch (apiError: any) {
               this.logger.error('Both comment creation methods failed:', {
                 tinyMceError: tinyMceError.message,
@@ -293,6 +303,16 @@ export class CommentService extends BaseService {
       throw new Error('Comment ID and content are required');
     }
 
+    // 只有明确指定为 markdown 时才进行处理
+    let finalContent = content;
+    let finalRepresentation = representation;
+    
+    if (representation === 'markdown') {
+      const processedContent = MarkdownUtils.prepareContentForConfluence(content, representation as any);
+      finalContent = processedContent.content;
+      finalRepresentation = processedContent.representation;
+    }
+
     return this.retryOperation(async () => {
       this.logger.debug('Updating comment:', { id });
 
@@ -308,7 +328,7 @@ export class CommentService extends BaseService {
         }
       }
 
-      const result = await this.updateCommentWithStandardApi(id, content, currentVersion, representation);
+      const result = await this.updateCommentWithStandardApi(id, finalContent, currentVersion, finalRepresentation);
       
       // 清除缓存
       this.cache.delete(`comment:${id}`);
@@ -339,10 +359,20 @@ export class CommentService extends BaseService {
    * 回复评论
    */
   public async replyComment(request: ReplyCommentRequest): Promise<ConfluenceComment> {
-    const { pageId, parentCommentId, content, watch = false } = request;
+    const { pageId, parentCommentId, content, watch = false, representation = 'storage' } = request;
 
     if (!pageId || !parentCommentId || !content) {
       throw new Error('Page ID, parent comment ID and content are required');
+    }
+
+    // 只有明确指定为 markdown 时才进行处理
+    let finalContent = content;
+    let finalRepresentation = representation;
+    
+    if (representation === 'markdown') {
+      const processedContent = MarkdownUtils.prepareContentForConfluence(content, representation as any);
+      finalContent = processedContent.content;
+      finalRepresentation = processedContent.representation;
     }
 
     return this.retryOperation(async () => {
@@ -350,15 +380,15 @@ export class CommentService extends BaseService {
 
       switch (this.commentConfig.apiStrategy) {
         case CommentApiStrategy.STANDARD:
-          return await this.replyCommentWithStandardApi(pageId, parentCommentId, content);
+          return await this.replyCommentWithStandardApi(pageId, parentCommentId, finalContent, finalRepresentation);
 
         case CommentApiStrategy.TINYMCE:
           try {
-            return await this.replyCommentWithTinyMCE(pageId, parentCommentId, content, watch);
+            return await this.replyCommentWithTinyMCE(pageId, parentCommentId, finalContent, watch);
           } catch (error: any) {
             if (this.commentConfig.enableFallback) {
               this.logger.warn('TinyMCE reply failed, falling back to standard API:', error.message);
-              return await this.replyCommentWithStandardApi(pageId, parentCommentId, content);
+              return await this.replyCommentWithStandardApi(pageId, parentCommentId, finalContent, finalRepresentation);
             }
             throw error;
           }
@@ -366,10 +396,10 @@ export class CommentService extends BaseService {
         case CommentApiStrategy.AUTO:
         default:
           try {
-            return await this.replyCommentWithTinyMCE(pageId, parentCommentId, content, watch);
+            return await this.replyCommentWithTinyMCE(pageId, parentCommentId, finalContent, watch);
           } catch (tinyMceError: any) {
             this.logger.warn('TinyMCE reply failed, falling back to standard API:', tinyMceError.message);
-            return await this.replyCommentWithStandardApi(pageId, parentCommentId, content);
+            return await this.replyCommentWithStandardApi(pageId, parentCommentId, finalContent, finalRepresentation);
           }
       }
     });

@@ -5,6 +5,7 @@ import {
   UpdateInlineCommentRequest
 } from '../../types/confluence.types.js';
 import { BaseService } from '../base.service.js';
+import { MarkdownUtils } from '../../utils/markdown.js';
 
 /**
  * 行内评论服务类
@@ -28,6 +29,9 @@ export class InlineCommentService extends BaseService {
       throw new Error('Page ID, content and original selection are required');
     }
 
+    // 行内评论通常是简短文本，不进行自动 markdown 处理
+    const finalContent = content;
+
     return this.retryOperation(async () => {
       this.logger.debug('Creating inline comment with strategy:', { 
         pageId, 
@@ -39,19 +43,19 @@ export class InlineCommentService extends BaseService {
       switch (this.commentConfig.apiStrategy) {
         case CommentApiStrategy.STANDARD:
           return await this.createInlineCommentWithStandardApi(
-            pageId, content, originalSelection, matchIndex, numMatches, parentCommentId
+            pageId, finalContent, originalSelection, matchIndex, numMatches, parentCommentId
           );
 
         case CommentApiStrategy.TINYMCE:
           try {
             return await this.createInlineCommentWithCustomApi(
-              pageId, content, originalSelection, matchIndex, numMatches, serializedHighlights, parentCommentId
+              pageId, finalContent, originalSelection, matchIndex, numMatches, serializedHighlights, parentCommentId
             );
           } catch (error: any) {
             if (this.commentConfig.enableFallback) {
               this.logger.warn('Custom API failed, falling back to standard API:', error.message);
               return await this.createInlineCommentWithStandardApi(
-                pageId, content, originalSelection, matchIndex, numMatches, parentCommentId
+                pageId, finalContent, originalSelection, matchIndex, numMatches, parentCommentId
               );
             }
             throw error;
@@ -61,7 +65,7 @@ export class InlineCommentService extends BaseService {
         default:
           try {
             return await this.createInlineCommentWithCustomApi(
-              pageId, content, originalSelection, matchIndex, numMatches, serializedHighlights, parentCommentId
+              pageId, finalContent, originalSelection, matchIndex, numMatches, serializedHighlights, parentCommentId
             );
           } catch (customError: any) {
             this.logger.warn('Custom API failed, falling back to standard API:', {
@@ -71,7 +75,7 @@ export class InlineCommentService extends BaseService {
 
             try {
               return await this.createInlineCommentWithStandardApi(
-                pageId, content, originalSelection, matchIndex, numMatches, parentCommentId
+                pageId, finalContent, originalSelection, matchIndex, numMatches, parentCommentId
               );
             } catch (apiError: any) {
               this.logger.error('Both APIs failed for inline comment creation:', {
@@ -98,6 +102,9 @@ export class InlineCommentService extends BaseService {
       throw new Error('Comment ID and content are required');
     }
 
+    // 行内评论通常是简短文本，不进行自动 markdown 处理
+    const finalContent = content;
+
     return this.retryOperation(async () => {
       this.logger.debug('Updating inline comment with strategy:', { 
         commentId, 
@@ -107,15 +114,15 @@ export class InlineCommentService extends BaseService {
 
       switch (this.commentConfig.apiStrategy) {
         case CommentApiStrategy.STANDARD:
-          return await this.updateInlineCommentWithStandardApi(commentId, content, version);
+          return await this.updateInlineCommentWithStandardApi(commentId, finalContent, version);
 
         case CommentApiStrategy.TINYMCE:
           try {
-            return await this.updateInlineCommentWithCustomApi(commentId, content, version);
+            return await this.updateInlineCommentWithCustomApi(commentId, finalContent, version);
           } catch (error: any) {
             if (this.commentConfig.enableFallback) {
               this.logger.warn('Custom API failed, falling back to standard API:', error.message);
-              return await this.updateInlineCommentWithStandardApi(commentId, content, version);
+              return await this.updateInlineCommentWithStandardApi(commentId, finalContent, version);
             }
             throw error;
           }
@@ -123,7 +130,7 @@ export class InlineCommentService extends BaseService {
         case CommentApiStrategy.AUTO:
         default:
           try {
-            return await this.updateInlineCommentWithCustomApi(commentId, content, version);
+            return await this.updateInlineCommentWithCustomApi(commentId, finalContent, version);
           } catch (customError: any) {
             this.logger.warn('Custom API failed, falling back to standard API:', {
               error: customError.message,
@@ -131,7 +138,7 @@ export class InlineCommentService extends BaseService {
             });
 
             try {
-              return await this.updateInlineCommentWithStandardApi(commentId, content, version);
+              return await this.updateInlineCommentWithStandardApi(commentId, finalContent, version);
             } catch (apiError: any) {
               this.logger.error('Both APIs failed for inline comment update:', {
                 customError: customError.message,
@@ -213,25 +220,28 @@ export class InlineCommentService extends BaseService {
       throw new Error('Comment ID, page ID and content are required');
     }
 
+    // 行内评论通常是简短文本，不进行自动 markdown 处理
+    const finalContent = content;
+
     return this.retryOperation(async () => {
       this.logger.debug('Replying to inline comment with strategy:', { 
         commentId, 
         pageId, 
-        content: content.substring(0, 50) + '...',
+        content: finalContent.substring(0, 50) + '...',
         strategy: this.commentConfig.apiStrategy 
       });
 
       switch (this.commentConfig.apiStrategy) {
         case CommentApiStrategy.STANDARD:
-          return await this.replyInlineCommentWithStandardApi(commentId, pageId, content);
+          return await this.replyInlineCommentWithStandardApi(commentId, pageId, finalContent);
 
         case CommentApiStrategy.TINYMCE:
           try {
-            return await this.replyInlineCommentWithCustomApi(commentId, pageId, content);
+            return await this.replyInlineCommentWithCustomApi(commentId, pageId, finalContent);
           } catch (error: any) {
             if (this.commentConfig.enableFallback) {
               this.logger.warn('Custom API failed, falling back to standard API:', error.message);
-              return await this.replyInlineCommentWithStandardApi(commentId, pageId, content);
+              return await this.replyInlineCommentWithStandardApi(commentId, pageId, finalContent);
             }
             throw error;
           }
@@ -239,7 +249,7 @@ export class InlineCommentService extends BaseService {
         case CommentApiStrategy.AUTO:
         default:
           try {
-            return await this.replyInlineCommentWithCustomApi(commentId, pageId, content);
+            return await this.replyInlineCommentWithCustomApi(commentId, pageId, finalContent);
           } catch (customError: any) {
             this.logger.warn('Custom API failed, falling back to standard API:', {
               error: customError.message,
@@ -247,7 +257,7 @@ export class InlineCommentService extends BaseService {
             });
 
             try {
-              return await this.replyInlineCommentWithStandardApi(commentId, pageId, content);
+              return await this.replyInlineCommentWithStandardApi(commentId, pageId, finalContent);
             } catch (apiError: any) {
               this.logger.error('Both APIs failed for inline comment reply:', {
                 customError: customError.message,

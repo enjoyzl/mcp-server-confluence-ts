@@ -5,6 +5,7 @@ import {
 } from '../../types/confluence.types.js';
 import { BaseService } from '../base.service.js';
 import { SearchService } from './search.service.js';
+import { MarkdownUtils } from '../../utils/markdown.js';
 
 /**
  * 页面服务类
@@ -112,6 +113,11 @@ export class PageService extends BaseService {
       throw new Error('Space key, title and content are required');
     }
 
+    // 处理 markdown 格式
+    const processedContent = MarkdownUtils.prepareContentForConfluence(content, representation as any);
+    const finalContent = processedContent.content;
+    const finalRepresentation = processedContent.representation;
+
     return this.retryOperation(async () => {
       this.logger.debug('Creating page:', { spaceKey, title });
       
@@ -120,9 +126,9 @@ export class PageService extends BaseService {
         title,
         space: { key: spaceKey },
         body: {
-          [representation]: {
-            value: content,
-            representation
+          [finalRepresentation]: {
+            value: finalContent,
+            representation: finalRepresentation
           }
         },
         ...(parentId && { ancestors: [{ id: parentId }] })
@@ -143,6 +149,16 @@ export class PageService extends BaseService {
       throw new Error('Page ID is required');
     }
 
+    // 处理 markdown 格式（仅在有内容时处理）
+    let finalContent = content;
+    let finalRepresentation = representation;
+    
+    if (content) {
+      const processedContent = MarkdownUtils.prepareContentForConfluence(content, representation as any);
+      finalContent = processedContent.content;
+      finalRepresentation = processedContent.representation;
+    }
+
     // 获取当前页面信息
     const currentPage = await this.getPage(id);
     const currentVersion = currentPage.version?.number || 1;
@@ -156,11 +172,11 @@ export class PageService extends BaseService {
         version: {
           number: version || currentVersion + 1
         },
-        ...(content && {
+        ...(finalContent && {
           body: {
-            [representation]: {
-              value: content,
-              representation
+            [finalRepresentation]: {
+              value: finalContent,
+              representation: finalRepresentation
             }
           }
         })

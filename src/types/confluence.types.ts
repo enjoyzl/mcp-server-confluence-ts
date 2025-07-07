@@ -119,7 +119,7 @@ export interface CreatePageRequest {
   title: string;
   content: string;
   parentId?: string;
-  representation?: 'storage' | 'wiki' | 'editor2' | 'view';
+  representation?: 'storage' | 'wiki' | 'editor2' | 'view' | 'markdown';
 }
 
 // 更新页面请求参数
@@ -128,7 +128,7 @@ export interface UpdatePageRequest {
   title?: string;
   content?: string;
   version?: number;
-  representation?: 'storage' | 'wiki' | 'editor2' | 'view';
+  representation?: 'storage' | 'wiki' | 'editor2' | 'view' | 'markdown';
 }
 
 // Confluence 评论信息
@@ -201,7 +201,7 @@ export interface CommentSearchResult {
 export interface CreateCommentRequest {
   pageId: string;
   content: string;
-  representation?: 'storage' | 'wiki' | 'editor2' | 'view';
+  representation?: 'storage' | 'wiki' | 'editor2' | 'view' | 'markdown';
   parentCommentId?: string; // 用于回复评论
 }
 
@@ -210,7 +210,7 @@ export interface UpdateCommentRequest {
   id: string;
   content: string;
   version?: number; // 可选，自动获取并递增
-  representation?: 'storage' | 'wiki' | 'editor2' | 'view';
+  representation?: 'storage' | 'wiki' | 'editor2' | 'view' | 'markdown';
 }
 
 // 回复评论请求参数
@@ -219,6 +219,7 @@ export interface ReplyCommentRequest {
   parentCommentId: string;
   content: string;
   watch?: boolean;
+  representation?: 'storage' | 'wiki' | 'editor2' | 'view' | 'markdown';
 }
 
 // 行内评论信息

@@ -1,5 +1,51 @@
 # 更新日志
 
+## [未发布] Markdown 格式支持
+
+### 🆕 新增功能
+
+#### Markdown 完整支持
+- **页面管理**: `managePages` 工具现在支持 `representation: "markdown"`
+- **评论管理**: `manageComments` 工具全面支持 Markdown 格式
+  - 普通评论：创建、更新、回复
+  - 行内评论：创建、更新、回复
+- **智能检测**: 自动识别 Markdown 语法，无需明确指定格式
+- **安全转换**: 使用 `marked` 库安全转换为 HTML
+
+#### 技术实现
+- 新增 `MarkdownUtils` 工具类
+- 支持 GitHub Flavored Markdown (GFM)
+- 内置 XSS 安全防护
+- 自动过滤恶意脚本和标签
+
+#### 支持的 Markdown 语法
+- ✅ 标题（# ## ### 等）
+- ✅ 文本格式（**粗体** *斜体* ~~删除线~~）
+- ✅ 列表（有序和无序）
+- ✅ 链接和图片
+- ✅ 代码块和行内代码
+- ✅ 引用块
+- ✅ 表格
+- ✅ 分割线
+
+### 🔧 技术改进
+- 更新所有相关类型定义，添加 `markdown` 格式支持
+- 增强内容格式处理能力
+- 新增依赖：`marked` 和 `@types/marked`
+- **修复**: 移除已过时的 marked 配置选项（`headerIds`, `mangle`），确保与 marked v16.x 兼容
+
+### 📚 文档更新
+- 新增 [Markdown 支持功能文档](docs/MARKDOWN-SUPPORT.md)
+- 更新 README.md 添加 Markdown 示例
+- 更新参数说明文档
+
+### 🛡️ 安全特性
+- 自动移除 `<script>` 和 `<iframe>` 标签
+- 过滤 `javascript:` 协议
+- 移除事件处理器属性
+
+---
+
 ## [2024-12-19] 文档架构优化
 
 ### 📚 文档更新内容
