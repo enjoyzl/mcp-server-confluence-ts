@@ -12,12 +12,18 @@ import { ErrorResponse } from './types/confluence.types.js';
 const logger = Logger.getInstance();
 
 /**
+ * 全局计数器用于调试重复调用问题
+ */
+let globalCallCounter = 0;
+
+/**
  * 主函数
  * 负责初始化和启动 MCP 服务器
  */
 async function main() {
   try {
-    logger.info("MCP 服务器启动中...");
+    const mainStartId = Math.random().toString(36).substring(2, 8);
+    logger.info(`MCP 服务器启动中[${mainStartId}]...`);
 
     // 创建 MCP 服务器
     const server = new McpServer({
@@ -31,7 +37,7 @@ async function main() {
       }
     });
 
-    logger.debug("MCP 服务器已创建");
+    logger.debug(`MCP 服务器已创建[${mainStartId}]`);
 
     // 创建 Confluence 服务实例
     const config = configService.getConfig();
@@ -407,8 +413,11 @@ async function main() {
       { query: z.string().describe('搜索关键词（支持中文和英文，将自动转换为CQL格式）') },
       async ({ query }) => {
         try {
-          logger.debug(`调用 searchContent 工具，参数: ${query}`);
+          globalCallCounter++;
+          const callId = Math.random().toString(36).substring(2, 8);
+          logger.debug(`调用 searchContent 工具[${callId}]，参数: ${query}，全局计数: ${globalCallCounter}`);
           const results = await confluenceService.searchContent(query);
+          logger.debug(`searchContent 工具[${callId}]执行完成，全局计数: ${globalCallCounter}`);
           return {
             content: [{ 
               type: "text",

@@ -14,9 +14,10 @@ import { MarkdownUtils } from '../../utils/markdown.js';
 export class PageService extends BaseService {
   private searchService: SearchService;
 
-  constructor(config: any) {
+  constructor(config: any, searchService?: SearchService) {
     super(config);
-    this.searchService = new SearchService(config);
+    // 如果提供了searchService实例，使用它；否则创建新的（向后兼容）
+    this.searchService = searchService || new SearchService(config);
   }
 
   /**

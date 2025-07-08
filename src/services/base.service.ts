@@ -53,10 +53,18 @@ export abstract class BaseService {
   protected readonly maxRetries: number = 3;
   protected readonly commentConfig: CommentConfig;
 
-  constructor(config: ConfluenceClientConfig & { commentConfig?: CommentConfig }) {
+  constructor(config: ConfluenceClientConfig & { commentConfig?: CommentConfig; sharedClient?: ConfluenceClient }) {
     this.logger = Logger.getInstance();
     this.cache = new Map();
-    this.client = new ConfluenceClient(config);
+    
+    // 如果提供了共享客户端，使用它；否则创建新的客户端
+    if (config.sharedClient) {
+      this.client = config.sharedClient;
+      this.logger.debug(`${this.constructor.name} using shared HTTP client`);
+    } else {
+      this.client = new ConfluenceClient(config);
+      this.logger.debug(`${this.constructor.name} created new HTTP client`);
+    }
     
     // 评论配置默认值
     this.commentConfig = {

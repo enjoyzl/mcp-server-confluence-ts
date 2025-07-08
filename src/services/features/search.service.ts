@@ -36,7 +36,8 @@ export class SearchService extends BaseService {
     }
 
     return this.retryOperation(async () => {
-      this.logger.debug('Searching content:', { 
+      const searchId = Math.random().toString(36).substring(2, 8);
+      this.logger.debug(`Searching content[${searchId}]:`, { 
         originalQuery: query, 
         cql, 
         limit, 
@@ -55,7 +56,7 @@ export class SearchService extends BaseService {
           }
         });
         
-        this.logger.debug('Search successful:', {
+        this.logger.debug(`Search successful[${searchId}]:`, {
           totalSize: response.data.size,
           resultsCount: response.data.results?.length || 0
         });

@@ -13,7 +13,7 @@ import {
   UpdatePageRequest
 } from '../types/confluence.types.js';
 import { CommentConfig } from './base.service.js';
-import { ConfluenceClientConfig } from './confluence-client.js';
+import { ConfluenceClient, ConfluenceClientConfig } from './confluence-client.js';
 import { CommentService } from './features/comment-basic.service.js';
 import { SpaceService } from './features/space.service.js';
 import { SearchService } from './features/search.service.js';
@@ -32,12 +32,21 @@ export class ConfluenceService {
   private readonly inlineCommentService: InlineCommentService;
 
   constructor(config: ConfluenceClientConfig & { commentConfig?: CommentConfig }) {
-    // 初始化所有子服务
-    this.spaceService = new SpaceService(config);
-    this.searchService = new SearchService(config);
-    this.pageService = new PageService(config);
-    this.commentService = new CommentService(config);
-    this.inlineCommentService = new InlineCommentService(config);
+    // 创建共享的HTTP客户端实例，避免重复的拦截器注册
+    const sharedClient = new ConfluenceClient(config);
+    
+    // 修改配置，让所有子服务共享同一个客户端实例
+    const serviceConfig = {
+      ...config,
+      sharedClient // 添加共享客户端
+    };
+
+    // 初始化所有子服务，使用共享的客户端
+    this.spaceService = new SpaceService(serviceConfig);
+    this.searchService = new SearchService(serviceConfig);
+    this.pageService = new PageService(serviceConfig, this.searchService); // 传递共享的SearchService实例
+    this.commentService = new CommentService(serviceConfig);
+    this.inlineCommentService = new InlineCommentService(serviceConfig);
   }
 
   // ===========================================

@@ -23,15 +23,23 @@ export interface ConfluenceClientConfig {
   keepAlive?: boolean;
 }
 
+// 全局计数器来跟踪拦截器注册次数
+let interceptorRegistrationCount = 0;
+
 /**
  * Confluence API 客户端类
  */
 export class ConfluenceClient {
   private readonly axios: AxiosInstance;
   private readonly logger: ILoggerService;
+  private readonly instanceId: string;
 
   constructor(config: ConfluenceClientConfig) {
     this.logger = Logger.getInstance();
+    this.instanceId = Math.random().toString(36).substring(2, 8);
+    interceptorRegistrationCount++;
+    
+    this.logger.debug(`ConfluenceClient[${this.instanceId}] created (total: ${interceptorRegistrationCount})`);
     
     let authHeader: string;
     if (config.accessToken) {
@@ -76,7 +84,7 @@ export class ConfluenceClient {
         const startTime = Date.now();
         config.metadata = { startTime };
         
-        this.logger.debug('Request:', {
+        this.logger.debug(`Request[${this.instanceId}]:`, {
           method: config.method,
           url: config.url,
           params: config.params,
@@ -85,7 +93,7 @@ export class ConfluenceClient {
         return config;
       },
       (error) => {
-        this.logger.error('Request Error:', error);
+        this.logger.error(`Request[${this.instanceId}] Error:`, error);
         return Promise.reject(error);
       }
     );
@@ -96,7 +104,7 @@ export class ConfluenceClient {
         const startTime = response.config.metadata?.startTime;
         const duration = startTime ? Date.now() - startTime : 0;
         
-        this.logger.debug('Response:', {
+        this.logger.debug(`Response[${this.instanceId}]:`, {
           status: response.status,
           statusText: response.statusText,
           duration: `${duration}ms`,
@@ -109,7 +117,7 @@ export class ConfluenceClient {
         const startTime = error.config?.metadata?.startTime;
         const duration = startTime ? Date.now() - startTime : 0;
         
-        this.logger.error('Response Error:', {
+        this.logger.error(`Response[${this.instanceId}] Error:`, {
           message: error.message,
           code: error.code,
           status: error.response?.status,
