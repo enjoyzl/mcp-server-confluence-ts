@@ -58,6 +58,7 @@ async function main() {
     
     server.tool(
       "getSpace",
+      "获取指定空间的详细信息",
       { spaceKey: z.string().describe('空间Key（如：DEV, TECH, DOC 等）') },
       async ({ spaceKey }) => {
         try {
@@ -84,6 +85,7 @@ async function main() {
 
     server.tool(
       "getPageByPrettyUrl",
+      "通过空间Key和页面标题精确获取页面信息",
       { 
         spaceKey: z.string().describe('空间Key（如：DEV, TECH 等）'),
         title: z.string().describe('页面标题（精确匹配）')
@@ -117,6 +119,7 @@ async function main() {
 
     server.tool(
       "managePages",
+      "管理Confluence页面，包括创建、更新、删除和查询页面信息",
       {
         action: z.enum(['create', 'update', 'delete', 'get', 'getContent']).describe('操作类型: create=创建页面, update=更新页面, delete=删除页面, get=获取页面基本信息, getContent=获取页面详细内容'),
         // 通用参数
@@ -215,6 +218,7 @@ async function main() {
 
     server.tool(
       "manageComments",
+      "管理Confluence页面评论，支持普通评论和行内评论的增删改查操作",
       {
         action: z.enum(['create', 'update', 'delete', 'reply']).describe('操作类型: create=创建评论, update=更新评论, delete=删除评论, reply=回复评论'),
         commentType: z.enum(['regular', 'inline']).optional().describe('评论类型: regular=普通评论（默认）, inline=行内评论'),
@@ -350,6 +354,7 @@ async function main() {
 
     server.tool(
       "getPageComments",
+      "获取指定页面的所有评论列表",
       {
         pageId: z.string().describe('页面ID'),
         start: z.number().optional().describe('起始位置（分页参数，默认0）'),
@@ -380,6 +385,7 @@ async function main() {
 
     server.tool(
       "getComment",
+      "获取指定ID的评论详细信息",
       { commentId: z.string().describe('评论ID') },
       async ({ commentId }) => {
         try {
@@ -410,6 +416,7 @@ async function main() {
 
     server.tool(
       "searchContent",
+      "在Confluence中搜索内容，支持使用Confluence Query Language (CQL)进行高级搜索",
       { query: z.string().describe('搜索关键词（支持中文和英文，将自动转换为CQL格式）') },
       async ({ query }) => {
         try {
@@ -439,6 +446,7 @@ async function main() {
 
     server.tool(
       "searchComments",
+      "在Confluence中搜索评论内容",
       {
         query: z.string().describe('搜索关键词（在评论内容中搜索）'),
         start: z.number().optional().describe('起始位置（分页参数，默认0）'),
