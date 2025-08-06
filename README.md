@@ -543,6 +543,89 @@ npm run inspector:dev
 ✅ **新增删除功能**: 支持删除页面操作  
 ✅ **双评论类型**: 统一管理普通评论和行内评论
 
+## 🚀 新功能：Markdown 导出
+
+### 导出功能概览
+
+现在支持将 Confluence 页面导出为 Markdown 文件到当前工作空间！
+
+#### 🎯 支持的导出方式
+
+1. **单页面导出** (`exportPage`)
+   - 导出指定页面为 Markdown 文件
+   - 支持按章节拆分大文档
+   - 可选的 YAML frontmatter 元数据
+
+2. **层次结构导出** (`exportPageHierarchy`)
+   - 递归导出页面及其所有子页面
+   - 保持原有的目录层次结构
+   - 可控制递归深度
+
+3. **批量导出** (`batchExportPages`)
+   - 同时导出多个指定页面
+   - 智能并发控制和错误处理
+   - 性能优化和进度跟踪
+
+#### 🌟 核心特性
+
+- ✅ **智能内容转换**: 高质量的 HTML 到 Markdown 转换
+- ✅ **章节拆分**: 根据标题级别自动拆分大文档
+- ✅ **元数据保留**: 完整的页面信息作为 YAML frontmatter
+- ✅ **文件管理**: 智能文件命名和冲突处理
+- ✅ **性能优化**: 并发控制、重试机制、内存优化
+- ✅ **进度跟踪**: 实时导出状态和错误报告
+
+#### 📖 快速开始
+
+```bash
+# 导出单个页面
+{
+  "pageId": "123456789",
+  "outputDir": "my-docs",
+  "includeMetadata": true
+}
+
+# 按章节拆分导出
+{
+  "pageId": "123456789",
+  "splitByChapters": true,
+  "splitLevel": "2"
+}
+
+# 导出页面层次结构
+{
+  "pageId": "123456789",
+  "maxDepth": 3,
+  "includeChildren": true
+}
+
+# 批量导出多个页面
+{
+  "pageIds": ["123", "456", "789"],
+  "concurrency": 3
+}
+```
+
+#### 📁 输出示例
+
+```
+confluence-export/
+├── API_Documentation.md           # 单页面导出
+├── User_Guide/                    # 层次结构导出
+│   ├── User_Guide.md
+│   ├── Getting_Started/
+│   │   └── Installation.md
+│   └── Advanced_Topics/
+│       └── Configuration.md
+└── Large_Document/                # 章节拆分导出
+    ├── README.md                  # 章节索引
+    ├── 01_introduction.md
+    ├── 02_setup.md
+    └── 03_usage.md
+```
+
+详细使用指南请参考：[导出功能指南](docs/export-functionality-guide.md)
+
 ## 安全建议
 
 1. 优先使用 Access Token 认证方式，这样更安全

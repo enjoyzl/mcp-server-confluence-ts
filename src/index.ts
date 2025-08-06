@@ -476,6 +476,310 @@ async function main() {
       }
     );
 
+    // ===========================================
+    // 5. 导出工具 - Markdown导出功能
+    // ===========================================
+
+    server.tool(
+      "exportPage",
+      "导出Confluence页面为Markdown文件到当前工作空间",
+      {
+        // 页面标识参数（二选一）
+        pageId: z.string().optional().describe('页面ID'),
+        spaceKey: z.string().optional().describe('空间Key（与title配合使用）'),
+        title: z.string().optional().describe('页面标题（与spaceKey配合使用）'),
+        
+        // 导出选项
+        outputDir: z.string().optional().describe('输出目录（相对于工作空间根目录，默认为"confluence-export"）'),
+        overwrite: z.boolean().optional().describe('是否覆盖现有文件（默认false，会自动重命名）'),
+        includeMetadata: z.boolean().optional().describe('是否包含页面元数据作为YAML frontmatter（默认true）'),
+        preserveAttachments: z.boolean().optional().describe('是否保留附件信息（默认true）'),
+        
+        // 章节拆分选项
+        splitByChapters: z.boolean().optional().describe('是否按章节拆分为多个文件（默认false）'),
+        splitLevel: z.enum(['1', '2', '3']).optional().describe('拆分级别：1=H1标题，2=H2标题，3=H3标题（默认2）')
+      },
+      async ({ pageId, spaceKey, title, outputDir, overwrite, includeMetadata, preserveAttachments, splitByChapters, splitLevel }) => {
+        try {
+          logger.debug(`调用 exportPage 工具，参数:`, { pageId, spaceKey, title, outputDir, splitByChapters });
+          
+          // 验证参数
+          if (!pageId && !(spaceKey && title)) {
+            throw new Error('必须提供 pageId 或者 spaceKey + title');
+          }
+          
+          // 构建导出选项
+          const exportOptions = {
+            pageId,
+            spaceKey,
+            title,
+            outputDir,
+            overwrite,
+            includeMetadata,
+            preserveAttachments,
+            splitByChapters,
+            splitLevel: splitLevel ? parseInt(splitLevel) as 1 | 2 | 3 : undefined
+          };
+          
+          const result = await confluenceService.exportPage(exportOptions);
+          
+          // 构建响应消息
+          const responseLines = [
+            `# 导出完成`,
+            ``,
+            `## 导出摘要`,
+            `- 总页面数: ${result.summary.totalPages}`,
+            `- 成功导出: ${result.summary.successfulExports}`,
+            `- 失败数量: ${result.summary.failedExports}`,
+            `- 生成文件: ${result.summary.totalFiles}`,
+            `- 总大小: ${Math.round(result.summary.totalSize / 1024)}KB`,
+            `- 耗时: ${result.summary.duration}ms`,
+            ``
+          ];
+          
+          if (result.exportedFiles.length > 0) {
+            responseLines.push(`## 导出的文件`);
+            result.exportedFiles.forEach(file => {
+              const relativePath = file.filePath.replace(process.cwd(), '.');
+              if (file.chapterTitle) {
+                responseLines.push(`- **${file.chapterTitle}**: \`${relativePath}\` (${Math.round(file.fileSize / 1024)}KB)`);
+              } else {
+                responseLines.push(`- **${file.originalTitle}**: \`${relativePath}\` (${Math.round(file.fileSize / 1024)}KB)`);
+              }
+            });
+            responseLines.push(``);
+          }
+          
+          if (result.errors.length > 0) {
+            responseLines.push(`## 错误信息`);
+            result.errors.forEach(error => {
+              responseLines.push(`- **${error.pageTitle}**: ${error.error}`);
+            });
+            responseLines.push(``);
+          }
+          
+          responseLines.push(`> 导出状态: ${result.success ? '✅ 成功' : '❌ 部分失败'}`);
+          
+          return {
+            content: [{ 
+              type: "text",
+              text: responseLines.join('\n')
+            }]
+          };
+        } catch (error) {
+          const err = error as ErrorResponse;
+          return {
+            content: [{
+              type: "text",
+              text: `导出页面失败: ${err.message}`
+            }],
+            isError: true
+          };
+        }
+      }
+    );
+
+    server.tool(
+      "exportPageHierarchy",
+      "导出Confluence页面层次结构为Markdown文件到当前工作空间",
+      {
+        // 页面标识参数
+        pageId: z.string().describe('根页面ID'),
+        
+        // 导出选项
+        outputDir: z.string().optional().describe('输出目录（相对于工作空间根目录，默认为"confluence-export"）'),
+        overwrite: z.boolean().optional().describe('是否覆盖现有文件（默认false，会自动重命名）'),
+        includeMetadata: z.boolean().optional().describe('是否包含页面元数据作为YAML frontmatter（默认true）'),
+        preserveAttachments: z.boolean().optional().describe('是否保留附件信息（默认true）'),
+        
+        // 层次结构选项
+        maxDepth: z.number().optional().describe('最大递归深度（默认5，防止无限递归）'),
+        includeChildren: z.boolean().optional().describe('是否包含子页面（默认true）')
+      },
+      async ({ pageId, outputDir, overwrite, includeMetadata, preserveAttachments, maxDepth, includeChildren }) => {
+        try {
+          logger.debug(`调用 exportPageHierarchy 工具，参数:`, { pageId, outputDir, maxDepth, includeChildren });
+          
+          // 构建导出选项
+          const exportOptions = {
+            pageId,
+            outputDir,
+            overwrite,
+            includeMetadata,
+            preserveAttachments,
+            maxDepth,
+            includeChildren
+          };
+          
+          const result = await confluenceService.exportPageHierarchy(exportOptions);
+          
+          // 构建响应消息
+          const responseLines = [
+            `# 层次结构导出完成`,
+            ``,
+            `## 导出摘要`,
+            `- 总页面数: ${result.summary.totalPages}`,
+            `- 成功导出: ${result.summary.successfulExports}`,
+            `- 失败数量: ${result.summary.failedExports}`,
+            `- 生成文件: ${result.summary.totalFiles}`,
+            `- 总大小: ${Math.round(result.summary.totalSize / 1024)}KB`,
+            `- 耗时: ${result.summary.duration}ms`,
+            ``
+          ];
+          
+          if (result.exportedFiles.length > 0) {
+            responseLines.push(`## 导出的文件`);
+            
+            // 按目录层级组织文件显示
+            const filesByDir = new Map<string, typeof result.exportedFiles>();
+            result.exportedFiles.forEach(file => {
+              const dir = file.filePath.substring(0, file.filePath.lastIndexOf('/')) || '.';
+              if (!filesByDir.has(dir)) {
+                filesByDir.set(dir, []);
+              }
+              filesByDir.get(dir)!.push(file);
+            });
+            
+            filesByDir.forEach((files, dir) => {
+              const relativePath = dir.replace(process.cwd(), '.');
+              responseLines.push(`### ${relativePath}`);
+              files.forEach(file => {
+                const fileName = file.filePath.substring(file.filePath.lastIndexOf('/') + 1);
+                responseLines.push(`- **${file.originalTitle}**: \`${fileName}\` (${Math.round(file.fileSize / 1024)}KB)`);
+              });
+              responseLines.push(``);
+            });
+          }
+          
+          if (result.errors.length > 0) {
+            responseLines.push(`## 错误信息`);
+            result.errors.forEach(error => {
+              responseLines.push(`- **${error.pageTitle}**: ${error.error}`);
+            });
+            responseLines.push(``);
+          }
+          
+          responseLines.push(`> 导出状态: ${result.success ? '✅ 成功' : '❌ 部分失败'}`);
+          
+          return {
+            content: [{ 
+              type: "text",
+              text: responseLines.join('\n')
+            }]
+          };
+        } catch (error) {
+          const err = error as ErrorResponse;
+          return {
+            content: [{
+              type: "text",
+              text: `导出页面层次结构失败: ${err.message}`
+            }],
+            isError: true
+          };
+        }
+      }
+    );
+
+    server.tool(
+      "batchExportPages",
+      "批量导出多个Confluence页面为Markdown文件到当前工作空间",
+      {
+        // 页面标识参数
+        pageIds: z.array(z.string()).describe('页面ID数组'),
+        
+        // 导出选项
+        outputDir: z.string().optional().describe('输出目录（相对于工作空间根目录，默认为"confluence-export"）'),
+        overwrite: z.boolean().optional().describe('是否覆盖现有文件（默认false，会自动重命名）'),
+        includeMetadata: z.boolean().optional().describe('是否包含页面元数据作为YAML frontmatter（默认true）'),
+        preserveAttachments: z.boolean().optional().describe('是否保留附件信息（默认true）'),
+        
+        // 批量处理选项
+        concurrency: z.number().optional().describe('并发处理数量（默认3，避免API限制）')
+      },
+      async ({ pageIds, outputDir, overwrite, includeMetadata, preserveAttachments, concurrency }) => {
+        try {
+          logger.debug(`调用 batchExportPages 工具，参数:`, { pageCount: pageIds.length, outputDir, concurrency });
+          
+          // 验证参数
+          if (!pageIds || pageIds.length === 0) {
+            throw new Error('必须提供至少一个页面ID');
+          }
+          
+          // 构建导出选项
+          const exportOptions = {
+            pageIds,
+            outputDir,
+            overwrite,
+            includeMetadata,
+            preserveAttachments,
+            concurrency
+          };
+          
+          const result = await confluenceService.batchExportPages(exportOptions);
+          
+          // 构建响应消息
+          const responseLines = [
+            `# 批量导出完成`,
+            ``,
+            `## 导出摘要`,
+            `- 总页面数: ${result.summary.totalPages}`,
+            `- 成功导出: ${result.summary.successfulExports}`,
+            `- 失败数量: ${result.summary.failedExports}`,
+            `- 生成文件: ${result.summary.totalFiles}`,
+            `- 总大小: ${Math.round(result.summary.totalSize / 1024)}KB`,
+            `- 耗时: ${result.summary.duration}ms`,
+            `- 平均每页: ${Math.round(result.summary.duration / result.summary.totalPages)}ms`,
+            ``
+          ];
+          
+          if (result.exportedFiles.length > 0) {
+            responseLines.push(`## 导出的文件`);
+            result.exportedFiles.forEach((file, index) => {
+              const relativePath = file.filePath.replace(process.cwd(), '.');
+              responseLines.push(`${index + 1}. **${file.originalTitle}**: \`${relativePath}\` (${Math.round(file.fileSize / 1024)}KB)`);
+            });
+            responseLines.push(``);
+          }
+          
+          if (result.errors.length > 0) {
+            responseLines.push(`## 错误信息`);
+            result.errors.forEach((error, index) => {
+              responseLines.push(`${index + 1}. **${error.pageTitle}** (${error.pageId}): ${error.error}`);
+            });
+            responseLines.push(``);
+          }
+          
+          // 添加性能统计
+          if (result.summary.totalPages > 1) {
+            const successRate = Math.round((result.summary.successfulExports / result.summary.totalPages) * 100);
+            responseLines.push(`## 性能统计`);
+            responseLines.push(`- 成功率: ${successRate}%`);
+            responseLines.push(`- 并发数: ${concurrency || 3}`);
+            responseLines.push(`- 平均文件大小: ${Math.round(result.summary.totalSize / result.summary.totalFiles / 1024)}KB`);
+            responseLines.push(``);
+          }
+          
+          responseLines.push(`> 导出状态: ${result.success ? '✅ 全部成功' : '⚠️ 部分失败'}`);
+          
+          return {
+            content: [{ 
+              type: "text",
+              text: responseLines.join('\n')
+            }]
+          };
+        } catch (error) {
+          const err = error as ErrorResponse;
+          return {
+            content: [{
+              type: "text",
+              text: `批量导出页面失败: ${err.message}`
+            }],
+            isError: true
+          };
+        }
+      }
+    );
+
     // 创建传输层
     const transport = new StdioServerTransport();
 

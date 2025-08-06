@@ -1,5 +1,5 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
-import https from 'https';
+import * as https from 'https';
 import { Logger, ILoggerService } from '../utils/logger.js';
 
 // 扩展 AxiosRequestConfig 类型以包含 metadata

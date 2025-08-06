@@ -12,6 +12,12 @@ import {
   UpdateInlineCommentRequest,
   UpdatePageRequest
 } from '../types/confluence.types.js';
+import {
+  ExportPageOptions,
+  ExportHierarchyOptions,
+  BatchExportOptions,
+  ExportResult
+} from '../types/export.types.js';
 import { CommentConfig } from './base.service.js';
 import { ConfluenceClient, ConfluenceClientConfig } from './confluence-client.js';
 import { CommentService } from './features/comment-basic.service.js';
@@ -19,6 +25,7 @@ import { SpaceService } from './features/space.service.js';
 import { SearchService } from './features/search.service.js';
 import { InlineCommentService } from './features/comment-inline.service.js';
 import { PageService } from './features/page.service.js';
+import { ExportService } from './features/export.service.js';
 
 /**
  * Confluence 服务类（重构版）
@@ -30,6 +37,7 @@ export class ConfluenceService {
   private readonly pageService: PageService;
   private readonly commentService: CommentService;
   private readonly inlineCommentService: InlineCommentService;
+  private readonly exportService: ExportService;
 
   constructor(config: ConfluenceClientConfig & { commentConfig?: CommentConfig }) {
     // 创建共享的HTTP客户端实例，避免重复的拦截器注册
@@ -47,6 +55,7 @@ export class ConfluenceService {
     this.pageService = new PageService(serviceConfig, this.searchService); // 传递共享的SearchService实例
     this.commentService = new CommentService(serviceConfig);
     this.inlineCommentService = new InlineCommentService(serviceConfig);
+    this.exportService = new ExportService(serviceConfig);
   }
 
   // ===========================================
@@ -86,6 +95,7 @@ export class ConfluenceService {
     this.pageService.clearCache();
     this.commentService.clearCache();
     this.inlineCommentService.clearCache();
+    this.exportService.clearCache();
   }
 
   // ===========================================
@@ -245,5 +255,30 @@ export class ConfluenceService {
    */
   public async replyInlineComment(request: ReplyInlineCommentRequest): Promise<InlineComment> {
     return this.inlineCommentService.replyInlineComment(request);
+  }
+
+  // ===========================================
+  // 5. 导出功能 - 委托给 ExportService
+  // ===========================================
+
+  /**
+   * 导出单个页面为Markdown文件
+   */
+  public async exportPage(options: ExportPageOptions): Promise<ExportResult> {
+    return this.exportService.exportPage(options);
+  }
+
+  /**
+   * 导出页面层次结构为Markdown文件
+   */
+  public async exportPageHierarchy(options: ExportHierarchyOptions): Promise<ExportResult> {
+    return this.exportService.exportPageHierarchy(options);
+  }
+
+  /**
+   * 批量导出多个页面为Markdown文件
+   */
+  public async batchExportPages(options: BatchExportOptions): Promise<ExportResult> {
+    return this.exportService.batchExportPages(options);
   }
 } 

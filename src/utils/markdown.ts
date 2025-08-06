@@ -1,4 +1,5 @@
 import { marked } from 'marked';
+import TurndownService from 'turndown';
 
 /**
  * Markdown 转换工具
@@ -93,8 +94,44 @@ export class MarkdownUtils {
     return cleaned.trim();
   }
 
+
+
   /**
-   * 处理内容格式转换
+   * 将 HTML 转换为 Markdown
+   * @param html HTML 文本
+   * @returns Markdown 格式的内容
+   */
+  static htmlToMarkdown(html: string): string {
+    if (!html || typeof html !== 'string') {
+      return '';
+    }
+
+    try {
+      const turndownService = new TurndownService({
+        headingStyle: 'atx',          // 使用 # 风格的标题
+        bulletListMarker: '-',        // 使用 - 作为列表标记
+        codeBlockStyle: 'fenced',     // 使用围栏式代码块
+        fence: '```',                 // 代码块围栏
+        emDelimiter: '*',             // 斜体分隔符
+        strongDelimiter: '**',        // 粗体分隔符
+        linkStyle: 'inlined',         // 内联链接样式
+        linkReferenceStyle: 'full'    // 完整引用样式
+      });
+
+      // 转换 HTML 为 Markdown
+      const markdown = turndownService.turndown(html);
+      
+      // 清理多余的空行
+      return markdown.replace(/\n{3,}/g, '\n\n').trim();
+    } catch (error) {
+      console.error('HTML to Markdown conversion failed:', error);
+      // 如果转换失败，返回原始HTML内容
+      return html;
+    }
+  }
+
+  /**
+   * 处理内容格式转换（扩展版本）
    * @param content 原始内容
    * @param fromFormat 源格式
    * @param toFormat 目标格式
@@ -114,9 +151,12 @@ export class MarkdownUtils {
       return toFormat === 'storage' ? this.markdownToHtml(content) : content;
     }
 
-    // 如果目标格式是 markdown，目前不支持反向转换
+    // 如果目标格式是 markdown，使用新的HTML到Markdown转换
     if (toFormat === 'markdown') {
-      console.warn('HTML to Markdown conversion is not supported yet');
+      if (fromFormat === 'storage' || fromFormat === 'view') {
+        return this.htmlToMarkdown(content);
+      }
+      console.warn(`不支持从 ${fromFormat} 到 markdown 的转换`);
       return content;
     }
 
@@ -156,5 +196,28 @@ export class MarkdownUtils {
       content: content,
       representation: (representation as any) || 'storage'
     };
+  }
+
+  /**
+   * 为导出准备内容（从Confluence格式转换为Markdown）
+   * @param content 原始内容
+   * @param fromFormat 源格式
+   * @returns Markdown格式的内容
+   */
+  static prepareContentForExport(
+    content: string,
+    fromFormat: 'storage' | 'wiki' | 'editor2' | 'view' = 'storage'
+  ): string {
+    if (!content) {
+      return '';
+    }
+
+    // 如果已经是Markdown格式，直接返回
+    if (this.isMarkdown(content)) {
+      return content;
+    }
+
+    // 转换为Markdown
+    return this.convertFormat(content, fromFormat, 'markdown');
   }
 } 
