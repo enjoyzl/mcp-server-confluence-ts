@@ -22,28 +22,29 @@
 - **`src/services/`**: 业务服务层
 - **`src/types/`**: TypeScript 类型定义
 - **`src/utils/`**: 工具函数和共享组件
-- **`src/test/`**: 测试文件
-
-### 配置模块 (src/config/)
-```
-config/
-├── config.service.ts       # 配置服务主类
-```
+- **`test/`**: 测试文件
 
 ### 服务层 (src/services/)
 ```
 services/
 ├── base.service.ts         # 基础服务类
+├── config.service.ts       # 应用配置服务
 ├── confluence-client.ts    # HTTP 客户端封装
 ├── confluence.service.ts   # 主服务类（组合所有子服务）
+├── macro-config.service.ts # 宏配置服务
 ├── index.ts               # 服务导出
-└── features/              # 功能特定服务
-    ├── comment-basic.service.ts    # 普通评论服务
-    ├── comment-inline.service.ts   # 行内评论服务
-    ├── export.service.ts           # 导出功能服务
-    ├── page.service.ts             # 页面管理服务
-    ├── search.service.ts           # 搜索服务
-    └── space.service.ts            # 空间管理服务
+├── features/              # 功能特定服务
+│   ├── comment-basic.service.ts    # 普通评论服务
+│   ├── comment-inline.service.ts   # 行内评论服务
+│   ├── export.service.ts           # 导出功能服务
+│   ├── feature-services.ts         # 功能服务聚合
+│   ├── page.service.ts             # 页面管理服务
+│   ├── search.service.ts           # 搜索服务
+│   └── space.service.ts            # 空间管理服务
+└── macro-processors/       # 宏处理器服务
+    ├── base-macro-processor.ts     # 基础宏处理器
+    ├── macro-registry.ts           # 宏处理器注册表
+    └── index.ts                    # 宏处理器导出
 ```
 
 ### 类型定义 (src/types/)
@@ -59,24 +60,26 @@ types/
 ### 工具模块 (src/utils/)
 ```
 utils/
-├── macro-processors/       # 宏处理器
-│   ├── base-macro-processor.ts  # 基础宏处理器
-│   └── [各种具体宏处理器]
 ├── content-converter.ts    # 内容转换工具
+├── export-error.ts         # 导出错误处理
 ├── file-system.ts         # 文件系统操作
+├── html-parser-adapter.ts  # HTML 解析器适配器
 ├── logger.ts              # 日志工具
 ├── markdown.ts            # Markdown 处理
-└── [其他工具文件]
+├── performance-optimizer.ts # 性能优化工具
+└── progress-tracker.ts     # 进度跟踪工具
 ```
 
-### 测试结构 (src/test/)
+### 测试结构 (test/)
 ```
 test/
 ├── integration/           # 集成测试
-├── macro-processors/      # 宏处理器测试
-├── utils/                # 工具函数测试
-├── basic.test.ts         # 基础功能测试
-└── [其他测试文件]
+│   └── html-parser-adapter-integration.test.ts  # HTML解析器集成测试
+├── unit/                 # 单元测试
+│   ├── utils/            # 工具函数测试
+│   ├── macro-config.test.ts      # 宏配置服务测试
+│   └── macro-registry.test.ts    # 宏注册表测试
+└── test-config/          # 测试配置目录
 ```
 
 ## 架构模式

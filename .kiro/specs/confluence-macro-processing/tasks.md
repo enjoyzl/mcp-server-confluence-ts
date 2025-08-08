@@ -17,17 +17,17 @@
   - _需求: 1.1, 2.1, 3.1, 4.1, 5.1, 6.1, 7.1, 8.1_
 
 - [x] 3. 实现基础宏处理器抽象类
-  - 创建 `src/utils/macro-processors/base-macro-processor.ts` 文件
+  - 创建 `src/services/macro-processors/base-macro-processor.ts` 文件
   - 实现 BaseMacroProcessor 抽象类，定义宏处理器的通用接口
   - 实现 extractMacroParameters 和 generateFallbackContent 等通用方法
   - 添加错误处理和日志记录功能
   - 实现宏参数的注释化保留功能
   - _需求: 6.1, 6.2, 6.3, 7.1, 7.2_
 
-- [ ] 4. 创建宏注册器和配置管理系统
-  - 创建 `src/utils/macro-registry.ts` 文件，实现宏处理器注册和查找机制
-  - 创建 `src/utils/macro-config.ts` 文件，实现配置加载和管理
-  - 创建默认配置文件 `src/config/macro-config.json`
+- [x] 4. 创建宏注册器和配置管理系统
+  - 创建 `src/services/macro-registry.ts` 文件，实现宏处理器注册和查找机制
+  - 创建 `src/services/macro-config.service.ts` 文件，实现配置加载和管理
+  - 创建默认配置文件 `.macro-config.json`
   - 实现配置验证和错误处理逻辑
   - 支持黑名单配置和插件式扩展
   - _需求: 7.4, 7.5, 8.2, 8.4, 8.5_
@@ -49,7 +49,7 @@
   - _需求: 3.1, 3.2, 3.3_
 
 - [ ] 7. 实现代码宏处理器
-  - 创建 `src/utils/macro-processors/code-macro-processor.ts` 文件
+  - 创建 `src/services/macro-processors/code-macro-processor.ts` 文件
   - 实现代码宏的识别逻辑，支持各种代码宏格式
   - 实现语言类型提取和语法高亮信息保留
   - 支持代码标题、行号、折叠等功能的转换
@@ -58,7 +58,7 @@
   - _需求: 1.4, 1.5_
 
 - [ ] 8. 实现信息类宏处理器
-  - 创建 `src/utils/macro-processors/info-macro-processor.ts` 文件
+  - 创建 `src/services/macro-processors/info-macro-processor.ts` 文件
   - 实现 info、warning、note、error、tip 等信息宏的识别
   - 实现不同信息类型到 markdown 引用块的转换
   - 为不同类型的信息宏添加相应的图标
@@ -66,7 +66,7 @@
   - _需求: 2.4_
 
 - [ ] 9. 实现表格宏处理器
-  - 创建 `src/utils/macro-processors/table-macro-processor.ts` 文件
+  - 创建 `src/services/macro-processors/table-macro-processor.ts` 文件
   - 实现简单表格到 markdown 表格的转换逻辑
   - 检测复杂表格特性（合并单元格、排序等）
   - 对复杂表格保留 HTML 格式并添加说明
@@ -74,7 +74,7 @@
   - _需求: 3.4, 3.5_
 
 - [ ] 10. 实现图表宏处理器
-  - 创建 `src/utils/macro-processors/chart-macro-processor.ts` 文件
+  - 创建 `src/services/macro-processors/chart-macro-processor.ts` 文件
   - 实现流程图到 mermaid 格式的转换逻辑
   - 实现甘特图到 mermaid 格式的转换
   - 处理无法转换的图表，导出为图片链接
@@ -83,7 +83,7 @@
   - _需求: 4.1, 4.2, 4.3, 4.4, 4.5_
 
 - [ ] 11. 实现页面包含和引用宏处理器
-  - 创建 `src/utils/macro-processors/include-macro-processor.ts` 文件
+  - 创建 `src/services/macro-processors/include-macro-processor.ts` 文件
   - 实现页面包含宏的内容获取和嵌入逻辑
   - 实现页面引用宏到 markdown 链接的转换
   - 添加递归深度限制和循环引用检测
@@ -92,7 +92,7 @@
   - _需求: 5.1, 5.2, 5.3, 5.4, 5.5_
 
 - [ ] 12. 实现自定义和未知宏处理器
-  - 创建 `src/utils/macro-processors/custom-macro-processor.ts` 文件
+  - 创建 `src/services/macro-processors/custom-macro-processor.ts` 文件
   - 实现未知宏的识别和基础处理逻辑
   - 支持自定义宏的模式匹配和转换
   - 实现宏参数的保留和注释化
@@ -176,7 +176,7 @@
   - _需求: 2.2_
 
 - [ ] 22. 编写宏处理器单元测试
-  - 创建 `src/utils/macro-processors/__tests__/` 测试目录
+  - 在 `test/unit/macro-processors/` 目录下创建测试文件
   - 为每个宏处理器编写单元测试
   - 测试各种宏类型的识别和转换准确性
   - 测试错误处理和回退策略

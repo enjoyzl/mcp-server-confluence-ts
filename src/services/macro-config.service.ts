@@ -113,7 +113,7 @@ export class MacroConfigService {
           logger.info(`Loading macro config from: ${path}`);
           const configContent = readFileSync(path, 'utf-8');
           const parsedConfig = JSON.parse(configContent);
-          
+
           // 验证配置
           const validationResult = this.validateConfig(parsedConfig);
           if (validationResult.success) {
@@ -134,10 +134,10 @@ export class MacroConfigService {
 
       // 合并默认配置和加载的配置
       this.config = this.mergeConfigs(this.defaultConfig, loadedConfig);
-      
+
       // 验证最终配置
       this.validateFinalConfig();
-      
+
       logger.info('Macro configuration loaded successfully', {
         configPath: this.configPath,
         enabledProcessors: this.config.enabledProcessors?.length || 'all',
@@ -160,7 +160,7 @@ export class MacroConfigService {
    */
   private getConfigPaths(customPath?: string): string[] {
     const paths: string[] = [];
-    
+
     if (customPath) {
       paths.push(resolve(customPath));
     }
@@ -197,13 +197,13 @@ export class MacroConfigService {
    */
   private validateFinalConfig(): void {
     const logger = Logger.getInstance();
-    
+
     // 检查启用和禁用列表的冲突
     if (this.config.enabledProcessors && this.config.disabledProcessors) {
-      const conflicts = this.config.enabledProcessors.filter(processor => 
+      const conflicts = this.config.enabledProcessors.filter(processor =>
         this.config.disabledProcessors!.includes(processor)
       );
-      
+
       if (conflicts.length > 0) {
         logger.warn(`Conflicting processor configuration found: ${conflicts.join(', ')}`);
         // 移除冲突的处理器（禁用列表优先）

@@ -7,7 +7,8 @@ MCP Confluence 服务是一个基于 Model Context Protocol (MCP) 的 Confluence
 - **页面管理**: 创建、更新、删除和查询 Confluence 页面
 - **评论系统**: 支持普通评论和行内评论的完整生命周期管理
 - **搜索功能**: 全文搜索内容和评论，支持 CQL 语法
-- **导出功能**: 将 Confluence 页面导出为 Markdown 文件，支持宏处理
+- **导出功能**: 将 Confluence 页面导出为 Markdown 文件，支持智能宏处理
+- **宏处理系统**: 自动识别和转换各种 Confluence 宏为 Markdown 格式
 - **空间管理**: 获取和管理 Confluence 空间信息
 
 ## 技术特色
