@@ -1,0 +1,83 @@
+{
+  "_comment": "Confluence Macro Processor Configuration",
+  "_description": {
+    "enabledProcessors": "List of enabled processors. If not specified, all processors are enabled.",
+    "disabledProcessors": "List of disabled processors.",
+    "blacklistedMacros": "List of macro types to completely ignore.",
+    "fallbackStrategy": "Strategy when macro processing fails: preserve_html, convert_to_text, add_comment, skip",
+    "maxRecursionDepth": "Maximum depth for recursive macro processing (e.g., include macros)",
+    "timeout": "Timeout in milliseconds for macro processing",
+    "enableConcurrency": "Whether to enable concurrent macro processing",
+    "preserveUnknownMacros": "Whether to preserve unknown macros as HTML"
+  },
+
+  "disabledProcessors": [],
+  "blacklistedMacros": [
+    "deprecated-macro",
+    "legacy-widget"
+  ],
+  "fallbackStrategy": "preserve_html",
+  "maxRecursionDepth": 5,
+  "timeout": 30000,
+  "enableConcurrency": true,
+  "preserveUnknownMacros": true,
+  "customProcessors": {
+    "example-custom": {
+      "path": "./custom-processors/example-processor.js",
+      "priority": 10,
+      "enabled": false
+    }
+  },
+  "processorSettings": {
+    "markdown": {
+      "preserveFormatting": true,
+      "convertInlineToBlock": false,
+      "stripHtmlTags": false
+    },
+    "code": {
+      "preserveLineNumbers": true,
+      "addLanguageComment": true,
+      "enableSyntaxHighlighting": false,
+      "supportedLanguages": ["javascript", "typescript", "python", "java", "sql", "xml", "json"],
+      "defaultLanguage": "text"
+    },
+    "info": {
+      "useEmojis": true,
+      "preserveColors": false,
+      "iconMapping": {
+        "info": "💡",
+        "warning": "⚠️",
+        "error": "❌",
+        "tip": "✅",
+        "note": "📝"
+      }
+    },
+    "table": {
+      "maxComplexity": 10,
+      "preserveHtmlForComplex": true,
+      "detectMergedCells": true,
+      "preserveSorting": false
+    },
+    "chart": {
+      "preferMermaid": true,
+      "exportAsImage": false,
+      "includeDataLinks": true,
+      "supportedChartTypes": ["flowchart", "gantt", "pie", "bar", "line"],
+      "mermaidTheme": "default"
+    },
+    "include": {
+      "maxDepth": 3,
+      "handleCircularReferences": true,
+      "preservePermissionErrors": true,
+      "includeMetadata": true,
+      "processNestedMacros": true
+    },
+    "custom": {
+      "preserveParameters": true,
+      "addProcessingComments": true,
+      "fallbackToHtml": true
+    }
+  },
+  "debugMode": false,
+  "logLevel": "info"
+}
