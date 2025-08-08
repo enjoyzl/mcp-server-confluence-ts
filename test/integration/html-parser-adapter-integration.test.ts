@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from '@jest/globals';
-import { getHTMLParserAdapter } from '../../utils/html-parser-adapter.js';
+import { getHTMLParserAdapter } from '../../src/utils/html-parser-adapter.js';
 
 describe('HTML 解析器适配器集成测试', () => {
   const adapter = getHTMLParserAdapter();

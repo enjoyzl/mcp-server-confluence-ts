@@ -9,7 +9,7 @@ import {
   BrowserHTMLParserAdapter,
   HTMLParserAdapterFactory,
   getHTMLParserAdapter
-} from '../../utils/html-parser-adapter.js';
+} from '../../../src/utils/html-parser-adapter.js';
 
 describe('HTMLParserAdapter', () => {
   describe('NodeHTMLParserAdapter', () => {

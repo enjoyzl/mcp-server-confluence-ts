@@ -14,8 +14,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "test:unit": "jest src/test/utils src/test/macro-processors",
-    "test:integration": "jest src/test/integration",
+    "test:unit": "jest test/unit",
+    "test:integration": "jest test/integration",
     "inspector": "npx @modelcontextprotocol/inspector node dist/index.js",
     "inspector:dev": "cross-env DEBUG=* npx @modelcontextprotocol/inspector node dist/index.js"
   },

@@ -9,11 +9,6 @@
   - _需求: 2.1, 2.2, 2.3_
 
 - [x] 2. 创建宏处理核心类型定义和基础架构
-
-
-
-
-
   - 创建 `src/types/macro.types.ts` 文件，定义所有宏相关的接口和枚举
   - 实现 MacroInfo、MacroParameters、MacroProcessingContext 等核心接口
   - 定义 MacroFallbackStrategy、MacroErrorType 等枚举类型
@@ -21,7 +16,7 @@
   - 添加递归深度控制和循环引用检测的类型定义
   - _需求: 1.1, 2.1, 3.1, 4.1, 5.1, 6.1, 7.1, 8.1_
 
-- [ ] 3. 实现基础宏处理器抽象类
+- [x] 3. 实现基础宏处理器抽象类
   - 创建 `src/utils/macro-processors/base-macro-processor.ts` 文件
   - 实现 BaseMacroProcessor 抽象类，定义宏处理器的通用接口
   - 实现 extractMacroParameters 和 generateFallbackContent 等通用方法
