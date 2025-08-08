@@ -5,9 +5,9 @@
  */
 
 export { BaseMacroProcessor } from './base-macro-processor.js';
+export { MarkdownMacroProcessor } from './markdown-macro-processor.js';
 
 // 当其他具体的宏处理器实现后，在这里添加导出
-// export { MarkdownMacroProcessor } from './markdown-macro-processor.js';
 // export { CodeMacroProcessor } from './code-macro-processor.js';
 // export { InfoMacroProcessor } from './info-macro-processor.js';
 // export { TableMacroProcessor } from './table-macro-processor.js';
