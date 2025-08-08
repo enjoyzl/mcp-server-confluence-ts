@@ -28,11 +28,6 @@
 ```
 config/
 ├── config.service.ts       # 配置服务主类
-├── config.types.ts         # 配置相关类型定义
-├── config.validator.ts     # 配置验证器
-├── environment.config.ts   # 环境特定配置
-├── macro-processing.config.ts  # 宏处理配置
-└── macro-config.json       # 宏处理规则配置
 ```
 
 ### 服务层 (src/services/)
@@ -64,11 +59,6 @@ types/
 ### 工具模块 (src/utils/)
 ```
 utils/
-├── shared/                 # 共享工具
-│   ├── cache-manager.ts    # 缓存管理器
-│   ├── error-handler.ts    # 错误处理器
-│   ├── performance-monitor.ts  # 性能监控
-│   └── validation-utils.ts # 验证工具
 ├── macro-processors/       # 宏处理器
 │   ├── base-macro-processor.ts  # 基础宏处理器
 │   └── [各种具体宏处理器]
@@ -86,7 +76,6 @@ test/
 ├── macro-processors/      # 宏处理器测试
 ├── utils/                # 工具函数测试
 ├── basic.test.ts         # 基础功能测试
-├── e2e-macro-processing.test.ts  # 端到端宏处理测试
 └── [其他测试文件]
 ```
 

@@ -1,11 +1,14 @@
 // 导出相关的类型定义
 
+import type { MacroProcessingOptions, MacroProcessingStats, MacroProcessingError } from './macro.types.js';
+
 // 基础导出选项
 export interface BaseExportOptions {
   outputDir?: string;           // 输出目录，默认 "confluence-export"
   overwrite?: boolean;          // 是否覆盖现有文件
   includeMetadata?: boolean;    // 是否包含元数据
   preserveAttachments?: boolean; // 是否保留附件信息
+  macroProcessing?: MacroProcessingOptions; // 宏处理选项
 }
 
 // 单页面导出选项
@@ -36,6 +39,8 @@ export interface ExportResult {
   exportedFiles: ExportedFile[];
   errors: ExportError[];
   summary: ExportSummary;
+  macroProcessingStats?: MacroProcessingStats; // 宏处理统计信息
+  macroProcessingErrors?: MacroProcessingError[]; // 宏处理错误
 }
 
 // 导出的文件信息
@@ -67,6 +72,19 @@ export interface ExportSummary {
   duration: number;
   startTime: string;
   endTime: string;
+  macroProcessingSummary?: MacroProcessingSummary; // 宏处理摘要
+}
+
+// 宏处理摘要
+export interface MacroProcessingSummary {
+  totalMacros: number;          // 总宏数量
+  processedMacros: number;      // 成功处理的宏数量
+  failedMacros: number;         // 失败的宏数量
+  skippedMacros: number;        // 跳过的宏数量
+  fallbacksUsed: number;        // 使用回退策略的次数
+  processingTime: number;       // 宏处理总时间（毫秒）
+  mostCommonMacroTypes: string[]; // 最常见的宏类型
+  errorRate: number;            // 错误率（百分比）
 }
 
 // 错误类型枚举
@@ -76,7 +94,10 @@ export enum ExportErrorType {
   CONVERSION_FAILED = 'CONVERSION_FAILED',
   FILE_WRITE_ERROR = 'FILE_WRITE_ERROR',
   NETWORK_ERROR = 'NETWORK_ERROR',
-  INVALID_PARAMETERS = 'INVALID_PARAMETERS'
+  INVALID_PARAMETERS = 'INVALID_PARAMETERS',
+  MACRO_PROCESSING_FAILED = 'MACRO_PROCESSING_FAILED', // 宏处理失败
+  MACRO_TIMEOUT = 'MACRO_TIMEOUT', // 宏处理超时
+  MACRO_RECURSION_LIMIT = 'MACRO_RECURSION_LIMIT' // 宏递归深度超限
 }
 
 // 标题结构

@@ -13,4 +13,10 @@ export default {
       },
     ],
   },
-}; 
+  testTimeout: 30000,
+  collectCoverageFrom: [
+    'src/**/*.ts',
+    '!src/**/*.test.ts',
+    '!src/**/*.spec.ts',
+  ],
+};
