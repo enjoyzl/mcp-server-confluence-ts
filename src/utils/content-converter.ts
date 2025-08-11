@@ -37,6 +37,47 @@ export class ContentConverter {
      * 添加Confluence特有的转换规则
      */
     private static addConfluenceRules(turndown: TurndownService): void {
+        // 处理Confluence的结构化宏 - 这是关键的修复
+        turndown.addRule('confluenceStructuredMacro', {
+            filter: (node: HTMLElement) => {
+                const isStructuredMacro = node.nodeName === 'AC:STRUCTURED-MACRO' || 
+                                        (node.nodeName === 'DIV' && node.getAttribute && !!node.getAttribute('data-macro-name'));
+                
+                if (isStructuredMacro) {
+                    this.logger.debug('发现结构化宏', {
+                        nodeName: node.nodeName,
+                        macroName: node.getAttribute('ac:name') || node.getAttribute('data-macro-name') || 'unknown',
+                        innerHTML: node.innerHTML?.substring(0, 200)
+                    });
+                }
+                
+                return isStructuredMacro;
+            },
+            replacement: (content, node) => {
+                const element = node as Element;
+                const macroName = element.getAttribute('ac:name') || element.getAttribute('data-macro-name') || 'unknown';
+                
+                this.logger.info('处理结构化宏', {
+                    macroName,
+                    hasContent: !!content,
+                    contentLength: content?.length || 0,
+                    contentPreview: content?.substring(0, 100)
+                });
+                
+                // 特别处理Markdown宏
+                if (macroName === 'markdown') {
+                    return this.processMarkdownMacro(element, content);
+                }
+                
+                // 对于其他宏，保留内容或添加注释
+                if (content && content.trim()) {
+                    return content;
+                } else {
+                    return `<!-- ${macroName} 宏 -->`;
+                }
+            }
+        });
+
         // 处理Confluence的代码宏
         turndown.addRule('confluenceCodeMacro', {
             filter: (node) => {
@@ -87,6 +128,253 @@ export class ContentConverter {
     }
 
     /**
+     * 处理Markdown宏的特殊逻辑
+     */
+    private static processMarkdownMacro(element: Element, content: string): string {
+        try {
+            this.logger.info('处理Markdown宏', {
+                hasContent: !!content,
+                contentLength: content?.length || 0,
+                elementHTML: element.outerHTML?.substring(0, 300)
+            });
+
+            // 首先尝试从原始HTML中直接提取CDATA内容
+            const outerHTML = element.outerHTML || '';
+            const cdataMatch = outerHTML.match(/<!\[CDATA\[([\s\S]*?)\]\]>/);
+            if (cdataMatch && cdataMatch[1]) {
+                const cdataContent = cdataMatch[1];
+                this.logger.info('从原始HTML的CDATA中提取内容', {
+                    contentLength: cdataContent.length,
+                    contentPreview: cdataContent.substring(0, 200)
+                });
+                
+                // 检查是否为INLINE模式
+                const outputType = element.querySelector('ac\\:parameter[ac\\:name="atlassian-macro-output-type"]')?.textContent;
+                if (outputType === 'INLINE') {
+                    // 内联模式：将换行符替换为空格
+                    return cdataContent.replace(/\n/g, ' ').trim();
+                } else {
+                    // 块模式：保持原始格式
+                    return cdataContent;
+                }
+            }
+
+            // 查找ac:plain-text-body元素
+            const plainTextBody = element.querySelector('ac\\:plain-text-body');
+            if (plainTextBody) {
+                const cdataContent = plainTextBody.textContent || '';
+                this.logger.info('从ac:plain-text-body提取内容', {
+                    contentLength: cdataContent.length,
+                    contentPreview: cdataContent.substring(0, 200)
+                });
+                
+                if (cdataContent.trim()) {
+                    // 检查是否为INLINE模式
+                    const outputType = element.querySelector('ac\\:parameter[ac\\:name="atlassian-macro-output-type"]')?.textContent;
+                    if (outputType === 'INLINE') {
+                        // 内联模式：将换行符替换为空格
+                        return cdataContent.replace(/\n/g, ' ').trim();
+                    } else {
+                        // 块模式：保持原始格式
+                        return cdataContent;
+                    }
+                }
+            }
+
+            // 查找ac:rich-text-body元素
+            const richTextBody = element.querySelector('ac\\:rich-text-body');
+            if (richTextBody) {
+                const richContent = richTextBody.innerHTML || richTextBody.textContent || '';
+                this.logger.info('从ac:rich-text-body提取内容', {
+                    contentLength: richContent.length,
+                    contentPreview: richContent.substring(0, 200)
+                });
+                return richContent;
+            }
+
+            // 如果有传入的content，但不是"INLINE"字符串，使用它
+            if (content && content.trim() && content.trim() !== 'INLINE') {
+                this.logger.info('使用传入的content', {
+                    contentLength: content.length,
+                    contentPreview: content.substring(0, 200)
+                });
+                return content;
+            }
+
+            // 最后尝试从元素的textContent获取
+            const textContent = element.textContent || '';
+            if (textContent.trim() && textContent.trim() !== 'INLINE') {
+                this.logger.info('使用元素textContent', {
+                    contentLength: textContent.length,
+                    contentPreview: textContent.substring(0, 200)
+                });
+                return textContent;
+            }
+
+            this.logger.warn('Markdown宏没有找到任何内容');
+            return '<!-- Markdown宏内容为空 -->';
+
+        } catch (error) {
+            this.logger.error('处理Markdown宏失败:', error);
+            return `<!-- Markdown宏处理失败: ${error instanceof Error ? error.message : String(error)} -->`;
+        }
+    }
+
+    /**
+     * 预处理Confluence宏，在DOM解析之前提取CDATA内容
+     */
+    private static preprocessConfluenceMacros(html: string): string {
+        try {
+            this.logger.info('开始预处理Confluence宏');
+            
+            // 处理Markdown宏的CDATA内容
+            let processedHtml = html.replace(
+                /<ac:structured-macro[^>]*ac:name="markdown"[^>]*>([\s\S]*?)<\/ac:structured-macro>/g,
+                (match, macroContent) => {
+                    this.logger.debug('发现Markdown宏，开始处理CDATA', {
+                        matchLength: match.length,
+                        contentPreview: macroContent.substring(0, 200)
+                    });
+                    
+                    // 提取CDATA内容
+                    const cdataMatch = macroContent.match(/<!\[CDATA\[([\s\S]*?)\]\]>/);
+                    if (cdataMatch && cdataMatch[1]) {
+                        const cdataContent = cdataMatch[1];
+                        
+                        // 检查是否为INLINE模式
+                        const isInlineMode = macroContent.includes('atlassian-macro-output-type">INLINE<');
+                        
+                        this.logger.info('提取到CDATA内容', {
+                            contentLength: cdataContent.length,
+                            isInlineMode,
+                            contentPreview: cdataContent.substring(0, 200)
+                        });
+                        
+                        // 根据模式处理内容
+                        let processedContent = cdataContent;
+                        if (isInlineMode) {
+                            // 对于长内容，即使设置为INLINE模式也使用BLOCK模式
+                            if (cdataContent.length > 500) {
+                                this.logger.info('长内容自动切换为BLOCK模式', {
+                                    contentLength: cdataContent.length,
+                                    originalMode: 'INLINE'
+                                });
+                                // 保持原始格式
+                                processedContent = cdataContent;
+                            } else {
+                                // 内联模式：将换行符替换为空格
+                                processedContent = cdataContent.replace(/\n/g, ' ').trim();
+                            }
+                        }
+                        
+                        // 直接将Markdown内容转换为HTML结构
+                        const htmlContent = this.convertMarkdownToHtml(processedContent);
+                        return htmlContent;
+                    } else {
+                        this.logger.warn('Markdown宏中没有找到CDATA内容');
+                        return `<div class="processed-markdown-macro" data-original-type="markdown"><!-- 没有找到CDATA内容 --></div>`;
+                    }
+                }
+            );
+            
+            this.logger.info('Confluence宏预处理完成', {
+                originalLength: html.length,
+                processedLength: processedHtml.length,
+                hasChanges: html !== processedHtml
+            });
+            
+            return processedHtml;
+            
+        } catch (error) {
+            this.logger.error('预处理Confluence宏失败:', error);
+            return html; // 返回原始HTML作为回退
+        }
+    }
+
+    /**
+     * 将Markdown内容转换为HTML结构
+     */
+    private static convertMarkdownToHtml(markdown: string): string {
+        try {
+            // 简单的Markdown到HTML转换
+            let html = markdown;
+            
+            // 转换标题
+            html = html.replace(/^(#{1,6})\s+(.+)$/gm, (match, hashes, title) => {
+                const level = hashes.length;
+                return `<h${level}>${title.trim()}</h${level}>`;
+            });
+            
+            // 转换段落（将连续的非空行包装为段落）
+            const lines = html.split('\n');
+            const processedLines: string[] = [];
+            let currentParagraph: string[] = [];
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                
+                // 如果是空行或已经是HTML标签，结束当前段落
+                if (!line || line.startsWith('<')) {
+                    if (currentParagraph.length > 0) {
+                        processedLines.push(`<p>${currentParagraph.join(' ')}</p>`);
+                        currentParagraph = [];
+                    }
+                    if (line.startsWith('<')) {
+                        processedLines.push(line);
+                    }
+                } else {
+                    currentParagraph.push(line);
+                }
+            }
+            
+            // 处理最后一个段落
+            if (currentParagraph.length > 0) {
+                processedLines.push(`<p>${currentParagraph.join(' ')}</p>`);
+            }
+            
+            html = processedLines.join('\n');
+            
+            // 转换粗体和斜体
+            html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+            
+            // 转换代码
+            html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+            
+            // 转换列表
+            html = html.replace(/^\*\s+(.+)$/gm, '<li>$1</li>');
+            html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+            
+            // 转换链接
+            html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+            
+            this.logger.debug('Markdown转HTML完成', {
+                originalLength: markdown.length,
+                htmlLength: html.length
+            });
+            
+            return html;
+            
+        } catch (error) {
+            this.logger.error('Markdown转HTML失败:', error);
+            // 回退：将内容包装在div中
+            return `<div class="markdown-content">${this.escapeHtml(markdown)}</div>`;
+        }
+    }
+
+    /**
+     * 转义HTML特殊字符
+     */
+    private static escapeHtml(text: string): string {
+        return text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    /**
      * 获取信息宏的类型
      */
     private static getInfoMacroType(element: Element): string {
@@ -105,10 +393,19 @@ export class ContentConverter {
      */
     static htmlToMarkdown(html: string): string {
         if (!html || typeof html !== 'string') {
+            this.logger.warn('HTML内容为空或无效', { 
+                htmlType: typeof html, 
+                htmlValue: html 
+            });
             return '';
         }
 
         try {
+            this.logger.debug('开始HTML到Markdown转换', {
+                htmlLength: html.length,
+                containsMacros: html.includes('ac:structured-macro')
+            });
+
             const turndown = this.initializeTurndownService();
 
             // 对于大文件，使用流式处理
@@ -119,8 +416,23 @@ export class ContentConverter {
                 this.logger.debug(`处理大文件 (${Math.round(html.length / 1024)}KB)，使用流式转换`);
                 markdown = this.processLargeHtmlContent(html, turndown);
             } else {
-                markdown = turndown.turndown(html);
+                this.logger.debug('使用标准转换处理HTML内容');
+                
+                // 预处理HTML：提取并替换CDATA内容
+                const preprocessedHtml = this.preprocessConfluenceMacros(html);
+                this.logger.info('HTML预处理完成', {
+                    originalLength: html.length,
+                    preprocessedLength: preprocessedHtml.length,
+                    hasChanges: html !== preprocessedHtml
+                });
+                
+                markdown = turndown.turndown(preprocessedHtml);
             }
+
+            this.logger.debug('Turndown转换完成', {
+                originalLength: html.length,
+                markdownLength: markdown.length
+            });
 
             // 后处理：清理多余的空行
             markdown = markdown.replace(/\n{3,}/g, '\n\n');
@@ -131,8 +443,15 @@ export class ContentConverter {
             // 后处理：修复链接格式
             markdown = this.fixLinkFormatting(markdown);
 
-            this.logger.debug(`HTML转Markdown完成，原长度: ${html.length}, 转换后长度: ${markdown.length}`);
-            return markdown.trim();
+            const finalMarkdown = markdown.trim();
+            
+            this.logger.debug('HTML到Markdown转换完成', {
+                originalLength: html.length,
+                finalLength: finalMarkdown.length,
+                isEmpty: finalMarkdown.length === 0
+            });
+
+            return finalMarkdown;
         } catch (error) {
             this.logger.error('HTML转Markdown失败:', error);
             // 降级处理：返回HTML注释包装的原内容

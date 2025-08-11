@@ -168,18 +168,49 @@ export class ExportService extends BaseService {
       progressTracker?.startConversion(page.title);
       const htmlContent = page.body?.storage?.value || '';
       
+      // 检查页面内容
+      if (!htmlContent) {
+        this.logger.warn('页面HTML内容为空', {
+          pageId: page.id,
+          pageTitle: page.title
+        });
+      } else {
+        this.logger.debug('页面内容获取成功', {
+          pageId: page.id,
+          htmlLength: htmlContent.length
+        });
+      }
+      
       // 转换为Markdown
       const markdownContent = ContentConverter.htmlToMarkdown(htmlContent);
+      
+      this.logger.debug('HTML到Markdown转换完成', {
+        originalLength: htmlContent.length,
+        markdownLength: markdownContent.length
+      });
       
       // 生成文件内容
       let fileContent = markdownContent;
       if (options.includeMetadata !== false) {
         const frontmatter = ContentConverter.generateFrontmatter(page);
         fileContent = frontmatter + markdownContent;
+        
+        this.logger.info('添加frontmatter到文件内容', {
+          frontmatterLength: frontmatter.length,
+          markdownLength: markdownContent.length,
+          totalLength: fileContent.length
+        });
       }
       
       // 优化Markdown内容
+      const beforeOptimization = fileContent.length;
       fileContent = ContentConverter.optimizeMarkdown(fileContent);
+      
+      this.logger.info('优化Markdown内容完成', {
+        beforeLength: beforeOptimization,
+        afterLength: fileContent.length,
+        contentPreview: fileContent.substring(0, 500) + (fileContent.length > 500 ? '...' : '')
+      });
       
       // 确定输出路径
       const outputDir = options.outputDir || this.defaultOutputDir;
@@ -192,9 +223,21 @@ export class ExportService extends BaseService {
         options.overwrite ? ConflictStrategy.OVERWRITE : ConflictStrategy.RENAME
       );
       
+      this.logger.info('准备写入文件', {
+        filePath: finalFilePath,
+        contentLength: fileContent.length,
+        isEmpty: fileContent.trim().length === 0,
+        isOnlyMetadata: fileContent.includes('---') && fileContent.split('---').length >= 3 && fileContent.split('---')[2].trim().length === 0
+      });
+      
       // 写入文件
       progressTracker?.startWriting(path.basename(finalFilePath));
       await FileSystemUtils.writeFile(finalFilePath, fileContent);
+      
+      this.logger.info('文件写入完成', {
+        filePath: finalFilePath,
+        writtenLength: fileContent.length
+      });
       
       // 记录导出的文件
       const fileSize = await FileSystemUtils.getFileSize(finalFilePath);
