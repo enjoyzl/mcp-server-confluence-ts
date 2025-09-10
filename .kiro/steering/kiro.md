@@ -1,3 +1,3 @@
-# GitHub Copilot 指令
+# 开发指导
 > 全局规则请参考：#[[file:docs/rules/global-rules.md]]
 > 项目规则请参考：#[[file:docs/rules/project-rules.md]]
