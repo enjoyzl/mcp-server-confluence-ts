@@ -5,7 +5,6 @@
 ## 目录
 - [功能特性](#功能特性)
 - [快速开始](#快速开始)
-- [配置说明](#配置说明)
 - [开发指南](#开发指南)
 - [MCP 工具使用指南](#mcp-工具使用指南)
 - [工具概览](#工具概览)
@@ -65,35 +64,53 @@
 
 ## 快速开始
 
+### 认证配置
+
+**设置环境变量**:
+```bash
+# macOS/Linux 用户: ~/.zshrc 或 ~/.bashrc
+# 命令行
+echo 'export CONFLUENCE_PASSWORD=your_密码_here' >> ~/.zshrc
+echo 'export CONFLUENCE_USERNAME=用户名' >> ~/.zshrc
+source ~/.zshrc
+
+# Windows (PowerShell)
+# 系统属性 -> 高级 -> 环境变量
+# 或命令行
+[Environment]::SetEnvironmentVariable("CONFLUENCE_PASSWORD", "your_密码_here", "User")
+[Environment]::SetEnvironmentVariable("CONFLUENCE_USERNAME", "用户名", "User")
+```
+
+### MCP 安装
+#### Claude CLI 安装（推荐）
+
+```shell
+claude mcp add --transport stdio mcp-server-confluence-ts -- npx --registry=http://npm.howbuy.pa -y @howbuy/mcp-server-confluence-ts
+```
+
+#### Cursor 安装
+
+**Cursor MCP 配置文件** (通常位于 `~/.cursor/settings.json` 或项目 `.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "mcp-server-confluence-ts": {
+      "command": "npx",
+      "args": ["--registry=http://npm.howbuy.pa","-y", "@howbuy/mcp-server-confluence-ts"],
+      "env": {
+        "CONFLUENCE_URL": "your-confluence-url",
+      }
+    }
+  }
+}
+```
+
+## 开发指南
 ### 环境要求
 
 - Node.js >= 14.0.0
 - TypeScript >= 4.0.0
-
-### 安装
-
-```bash
-# 安装依赖
-npm install
-```
-
-### 构建
-
-```bash
-# 清理并构建项目
-npm run build:clean
-```
-
-### 启动服务
-
-```bash
-# 启动服务
-npm start
-```
-
-## 配置说明
-
-### 认证配置
 
 服务支持两种认证方式，你可以选择其中一种：
 
@@ -126,129 +143,27 @@ TIMEOUT=10000
 REJECT_UNAUTHORIZED=true
 ```
 
-### Cursor IDE 配置
-
-#### Windows 配置
-
-1. 使用 Smithery（推荐）
-在 `%USERPROFILE%\.cursor\mcp.json` 中添加：
-
-```json
-{
-  "mcpServers": {
-    "mcp-server-confluence-ts": {
-      "command": "cmd",
-      "args": [
-        "/c",
-        "npx",
-        "-y",
-        "@smithery/cli@latest",
-        "run",
-        "@enjoyzl/mcp-server-confluence-ts",
-        "--config",
-        "{\"confluenceUrl\":\"your-confluence-url\",\"confluenceUsername\":\"your-username\",\"confluencePassword\":\"your-password\"}"
-      ]
-    }
-  }
-}
-```
-
-2. 本地服务方式
-在 `%USERPROFILE%\.cursor\mcp.json` 中添加：
-
-```json
-{
-  "mcpServers": {
-    "mcp-server-confluence-ts": {
-      "command": "cmd",
-      "args": [
-        "/k",
-        "cd",
-        "/d",
-        "D:\\workspace\\code\\mcp\\mcp-server-confluence-ts",
-        "&",
-        "node",
-        "dist/index.js"
-      ]
-    }
-  }
-}
-```
-
-> **Windows 配置说明：**
-> - `/k`: 执行命令后保持命令窗口，便于查看日志
-> - `/d`: 切换到指定驱动器
-> - 使用 `&` 连接多个命令
-> - 路径使用双反斜杠 `\\` 转义
-> - 环境变量可以在项目的 `.env` 文件中配置
-
-#### Mac/Linux 配置
-
-1. 使用 Smithery（推荐）
-在 `~/.cursor/mcp.json` 中添加：
-
-```json
-{
-  "mcpServers": {
-    "mcp-server-confluence-ts": {
-      "command": "bash",
-      "args": [
-        "-c",
-        "npx -y @smithery/cli@latest run @enjoyzl/mcp-server-confluence-ts --config '{\"confluenceUrl\":\"your-confluence-url\",\"confluenceUsername\":\"your-username\",\"confluencePassword\":\"your-password\"}'"
-      ]
-    }
-  }
-}
-```
-
-2. 本地服务方式
-在 `~/.cursor/mcp.json` 中添加：
-
-```json
-{
-  "mcpServers": {
-    "mcp-server-confluence-ts": {
-      "command": "node",
-      "args": ["/Users/your-username/workspace/code/mcp/mcp-server-confluence-ts/dist/index.js"],
-      "env": {
-        "CONFLUENCE_URL": "your-confluence-url",
-        "CONFLUENCE_USERNAME": "youraccount",
-        "CONFLUENCE_PASSWORD": "yourpwd",
-      }
-    }
-  }
-}
-```
-
-> **Mac/Linux 配置说明：**
-> - `-c`: 执行命令字符串
-> - 使用 `&&` 连接多个命令
-> - 路径使用正斜杠 `/`
-> - 环境变量可以在项目的 `.env` 文件中配置
-> - Mac 用户主目录通常在 `/Users/your-username/`
-> - Linux 用户主目录通常在 `/home/your-username/`
-
-### 开发模式
+### 安装
 
 ```bash
-# 监听文件变化并自动编译
-npm run dev
-
-# 监听文件变化并自动重启服务
-npm run dev:start
+# 安装依赖
+npm install
 ```
 
-### 构建命令
+### 构建
 
 ```bash
-# 仅构建项目
-npm run build
-
-# 清理构建目录
-npm run clean
-
-# 清理并重新构建
+# 清理并构建项目
 npm run build:clean
+```
+
+### 启动服务
+
+```bash
+# 启动服务
+npm start
+# or
+npm dev:start
 ```
 
 ### 调试工具
@@ -259,6 +174,24 @@ npm run inspector
 
 # 开发调试模式（带详细日志）
 npm run inspector:dev
+```
+
+功能验证通过并 commit 后, 进行升级并部署 
+### 升级版本号
+npm 提供了 npm version 指令可以辅助我们来进行版本迭代
+```bash
+npm version patch => 1.0.1
+npm version minor => 1.1.0
+npm version major => 2.0.0
+```
+
+### 部署到私有 npm 仓库
+
+登录仓库参考: http://dms.intelnal.howbuy.com/pages/viewpage.action?pageId=101617315
+```bash
+# 登录并部署
+npm login --registry=http://nx-node.howbuy.pa/repository/npm-hosted-howbuy/
+npm publish @howbuy/mcp-server-confluence-ts
 ```
 
 ## MCP 工具使用指南
@@ -730,10 +663,6 @@ interface ErrorResponse {
 - [行内评论示例](docs/inline-comments-example.md)
 - [Confluence 7.4 兼容性](docs/CONFLUENCE-7.4-COMPATIBILITY.md)
 - [故障排除](docs/CONFLUENCE-7.4-TROUBLESHOOTING.md)
-
-## 贡献
-
-欢迎提交 Issue 和 Pull Request。
 
 ## 许可证
 
