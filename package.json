@@ -4,6 +4,9 @@
   "description": "Confluence MCP Server",
   "type": "module",
   "main": "dist/index.js",
+  "bin": {
+    "mcp-server-confluence-ts": "dist/index.js"
+  },
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
