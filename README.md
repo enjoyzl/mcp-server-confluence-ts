@@ -72,6 +72,7 @@
 # 命令行
 echo 'export CONFLUENCE_PASSWORD=your_密码_here' >> ~/.zshrc
 echo 'export CONFLUENCE_USERNAME=用户名' >> ~/.zshrc
+echo 'export CONFLUENCE_URL=Confluence 域名' >> ~/.zshrc
 source ~/.zshrc
 
 # Windows (PowerShell)
@@ -79,6 +80,7 @@ source ~/.zshrc
 # 或命令行
 [Environment]::SetEnvironmentVariable("CONFLUENCE_PASSWORD", "your_密码_here", "User")
 [Environment]::SetEnvironmentVariable("CONFLUENCE_USERNAME", "用户名", "User")
+[Environment]::SetEnvironmentVariable("CONFLUENCE_URL", "Confluence 域名", "User")
 ```
 
 ### MCP 安装
@@ -98,9 +100,6 @@ claude mcp add --transport stdio mcp-server-confluence-ts -- npx --registry=http
     "mcp-server-confluence-ts": {
       "command": "npx",
       "args": ["--registry=http://npm.howbuy.pa","-y", "@howbuy/mcp-server-confluence-ts"],
-      "env": {
-        "CONFLUENCE_URL": "your-confluence-url",
-      }
     }
   }
 }
