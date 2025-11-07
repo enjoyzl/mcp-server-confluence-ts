@@ -99,7 +99,7 @@ claude mcp add --transport stdio mcp-server-confluence-ts -- npx --registry=http
   "mcpServers": {
     "mcp-server-confluence-ts": {
       "command": "npx",
-      "args": ["--registry=http://npm.howbuy.pa","-y", "@howbuy/mcp-server-confluence-ts"],
+      "args": ["--registry=http://npm.howbuy.pa","-y", "@howbuy/mcp-server-confluence-ts"]
     }
   }
 }
