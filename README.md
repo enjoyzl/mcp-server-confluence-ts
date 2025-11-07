@@ -105,6 +105,11 @@ claude mcp add --transport stdio mcp-server-confluence-ts -- npx --registry=http
 }
 ```
 
+#### 使用 MCP 读写 Confluence
+
+参考章节 [MCP 工具使用指南](#mcp-工具使用指南)
+
+
 ## 开发指南
 ### 环境要求
 
