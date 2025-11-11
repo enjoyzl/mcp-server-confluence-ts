@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/enjoyzl-mcp-server-confluence-ts-badge.png)](https://mseep.ai/app/enjoyzl-mcp-server-confluence-ts)
+
 # MCP Confluence 服务
 
 这是一个基于 MCP (Model Context Protocol) 的 Confluence API 服务实现。该服务提供了与 Confluence 进行交互的能力，支持获取空间信息、页面内容、搜索等功能。
